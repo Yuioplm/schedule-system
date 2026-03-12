@@ -1,3 +1,10 @@
 __pycache__/
 *.pyc
 .env
+
+# data files
+csv/*
+!csv/.gitkeep
+
+database/*
+!database/.gitkeep
