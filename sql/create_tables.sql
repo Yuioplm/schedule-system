@@ -101,58 +101,37 @@ CREATE TABLE T_ConsultationSlot (
 -- ==========================
 -- スケジュール
 -- ==========================
-CREATE TABLE T_Schedule (
-    ScheduleID INTEGER PRIMARY KEY,
-    CalendarDate DATE,
-    SlotID INTEGER,
-    DoctorID INTEGER,
-    ClinDeptID INTEGER,
-    TimeSlotID INTEGER,
-    Room TEXT,
+CREATE VIEW V_ScheduleBase AS
 
-    UNIQUE(CalendarDate, TimeSlotID, Room),
-    
-    FOREIGN KEY (SlotID)
-        REFERENCES T_ConsultationSlot(SlotID),
+SELECT
+    d.CalendarDate,
+    cs.SlotID,
+    cs.ClinDeptID,
+    cs.DoctorID,
+    cs.TimeSlotID,
+    cs.Room,
+    cs.DisplayDoctorName,
+    cs.SpecialtyID
 
-    FOREIGN KEY (DoctorID)
-        REFERENCES M_Doctor(DoctorID),
+FROM M_Date d
 
-    FOREIGN KEY (ClinDeptID)
-        REFERENCES M_ClinicalDepartment(ClinDeptID),
+JOIN T_ConsultationSlot cs
+ON strftime('%w', d.CalendarDate) = cs.DayOfWeek
 
-    FOREIGN KEY (TimeSlotID)
-        REFERENCES M_TimeSlot(TimeSlotID)
-);
+WHERE
+    d.CalendarDate >= cs.StartDate
+AND d.CalendarDate <= cs.EndDate
 
--- ==========================
--- 予定変更履歴
--- ==========================
-CREATE TABLE T_ScheduleChange (
-    ChangeID INTEGER PRIMARY KEY,
-    ScheduleID INTEGER,
-    ChangeTypeID INTEGER,
-    ChangeDetail TEXT,
-    NewDoctorID INTEGER,
-    NewTimeSlotID INTEGER,
-    NewRoom TEXT,
-    Reason TEXT,
-    ChangeAcceptedDate DATE,
-    ChangedBy TEXT,
-    ActiveFlag INTEGER DEFAULT 1,
+AND substr(
+        cs.WeekPattern,
+        ((CAST(strftime('%d', d.CalendarDate) AS INTEGER) - 1) / 7) + 1,
+        1
+    ) = '1'
 
-    FOREIGN KEY (ScheduleID)
-        REFERENCES T_Schedule(ScheduleID),
-
-    FOREIGN KEY (ChangeTypeID)
-        REFERENCES M_ScheduleChangeType(ChangeTypeID),
-
-    FOREIGN KEY (NewDoctorID)
-        REFERENCES M_Doctor(DoctorID),
-
-    FOREIGN KEY (NewTimeSlotID)
-        REFERENCES M_TimeSlot(TimeSlotID)
-);
+ORDER BY
+    d.CalendarDate,
+    cs.TimeSlotID,
+    cs.ClinDeptID;
 
 -- ==========================
 -- 予定確認用ビュー
@@ -160,12 +139,10 @@ CREATE TABLE T_ScheduleChange (
 CREATE VIEW V_ScheduleFull AS
 
 SELECT
-    s.ScheduleID,
-    s.CalendarDate,
+    sb.CalendarDate,
+    strftime('%w', sb.CalendarDate) AS DayOfWeekNumber,
 
-    strftime('%w', s.CalendarDate) AS DayOfWeekNumber,
-
-    CASE strftime('%w', s.CalendarDate)
+    CASE strftime('%w', sb.CalendarDate)
         WHEN '0' THEN 'Sun'
         WHEN '1' THEN 'Mon'
         WHEN '2' THEN 'Tue'
@@ -178,76 +155,116 @@ SELECT
     cd.ClinDeptName,
     sp.SpecialtyName,
     ts.TimeSlotName,
-
-    s.Room,
-
+    sb.Room,
     d.DoctorID,
     d.DoctorName,
+    sb.DisplayDoctorName,
+    sb.SlotID
 
-    cs.DisplayDoctorName,
-
-    s.SlotID
-
-FROM T_Schedule s
-
-LEFT JOIN T_ConsultationSlot cs
-ON s.SlotID = cs.SlotID
+FROM V_ScheduleBase sb
 
 LEFT JOIN M_Doctor d
-ON s.DoctorID = d.DoctorID
+ON sb.DoctorID = d.DoctorID
 
 LEFT JOIN M_ClinicalDepartment cd
-ON s.ClinDeptID = cd.ClinDeptID
+ON sb.ClinDeptID = cd.ClinDeptID
 
 LEFT JOIN M_TimeSlot ts
-ON s.TimeSlotID = ts.TimeSlotID
+ON sb.TimeSlotID = ts.TimeSlotID
 
 LEFT JOIN M_Specialty sp
-ON cs.SpecialtyID = sp.SpecialtyID
+ON sb.SpecialtyID = sp.SpecialtyID
 
 ORDER BY
-s.CalendarDate,
-ts.TimeSlotID,
-s.Room;
+    sb.CalendarDate,
+    sb.TimeSlotID,
+    sb.ClinDeptID;
+
+-- ==========================
+-- 予定変更履歴
+-- ==========================
+CREATE TABLE T_ScheduleChange (
+
+    ChangeID INTEGER PRIMARY KEY,
+    CalendarDate DATE NOT NULL,
+    SlotID INTEGER,
+    ChangeTypeID INTEGER,
+    ChangeDetail TEXT,
+    NewDoctorID INTEGER,
+    NewTimeSlotID INTEGER,
+    NewRoom TEXT,
+    Reason TEXT,
+    ChangeAcceptedDate DATE,
+    ChangedBy TEXT,
+
+    FOREIGN KEY (SlotID)
+        REFERENCES T_ConsultationSlot(SlotID),
+
+    FOREIGN KEY (ChangeTypeID)
+        REFERENCES M_ScheduleChangeType(ChangeTypeID),
+
+    FOREIGN KEY (NewDoctorID)
+        REFERENCES M_Doctor(DoctorID),
+
+    FOREIGN KEY (NewTimeSlotID)
+        REFERENCES M_TimeSlot(TimeSlotID)
+);
+
+CREATE UNIQUE INDEX idx_schedulechange_unique_slot
+ON T_ScheduleChange (CalendarDate, SlotID)
+WHERE SlotID IS NOT NULL;
+
+CREATE INDEX idx_schedulechange_date
+ON T_ScheduleChange (CalendarDate);
 
 -- ==========================
 -- 予定変更結果確認用ビュー
 -- ==========================
 CREATE VIEW V_ScheduleActual AS
 
+-- 通常枠（変更反映）
+
 SELECT
+    sb.CalendarDate,
+    sb.SlotID,
+    sb.ClinDeptID,
+    COALESCE(sc.NewDoctorID, sb.DoctorID) AS DoctorID,
+    COALESCE(sc.NewTimeSlotID, sb.TimeSlotID) AS TimeSlotID,
+    COALESCE(sc.NewRoom, sb.Room) AS Room,
+    sb.DisplayDoctorName,
+    sc.ChangeTypeID,
+    sc.ChangeDetail,
+    sc.Reason
 
-s.ScheduleID,
-s.CalendarDate,
-
-COALESCE(sc.NewDoctorID, s.DoctorID) AS DoctorID,
-
-COALESCE(sc.NewTimeSlotID, s.TimeSlotID) AS TimeSlotID,
-
-COALESCE(sc.NewRoom, s.Room) AS Room,
-
-s.ClinDeptID,
-
-COALESCE(mct.IsCancel, 0) AS IsCancel,
-
-sc.ChangeTypeID,
-sc.ChangeDetail,
-sc.Reason,
-
-s.SlotID
-
-FROM T_Schedule s
+FROM V_ScheduleBase sb
 
 LEFT JOIN T_ScheduleChange sc
-ON s.ScheduleID = sc.ScheduleID
+ON sb.CalendarDate = sc.CalendarDate
+AND sb.SlotID = sc.SlotID
 
-LEFT JOIN M_ScheduleChangeType mct
-ON sc.ChangeTypeID = mct.ChangeTypeID
+UNION ALL
+
+-- 臨時外来（SlotIDが無い変更）
+SELECT
+    sc.CalendarDate,
+    NULL AS SlotID,
+    NULL AS ClinDeptID,
+    sc.NewDoctorID AS DoctorID,
+    sc.NewTimeSlotID AS TimeSlotID,
+    sc.NewRoom AS Room,
+    NULL AS DisplayDoctorName,
+    sc.ChangeTypeID,
+    sc.ChangeDetail,
+    sc.Reason
+
+FROM T_ScheduleChange sc
+
+WHERE sc.SlotID IS NULL
 
 ORDER BY
-s.CalendarDate,
-TimeSlotID,
-Room;
+    sc.CalendarDate,
+    TimeSlotID,
+    ClinDeptID;
 
 --------------------------------------------------
 -- インデックス（検索高速化）
