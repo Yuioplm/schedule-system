@@ -27,10 +27,15 @@ with open(CSV_PATH, newline="", encoding="utf-8-sig") as f:
             cursor.execute("""
             INSERT INTO T_ConsultationSlot
             (
-                ClinDeptID,
-                SpecialtyID,
+                Rpt1ClinDeptID,
+                Rpt1SpecialtyID,
+                Rpt1DisplayDoctorName,
+                Rpt2ClinDeptID,
+                Rpt3ClinDeptID,
+                Rpt4ClinDeptID,
+                Rpt5ClinDeptID,
+                Rpt6ClinDeptID,
                 DoctorID,
-                DisplayDoctorName,
                 TimeSlotID,
                 Room,
                 DayOfWeek,
@@ -39,13 +44,18 @@ with open(CSV_PATH, newline="", encoding="utf-8-sig") as f:
                 EndDate,
                 ActiveFlag
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
 
-                null_if_empty(row["ClinDeptID"]),
-                null_if_empty(row["SpecialtyID"]),
+                null_if_empty(row["Rpt1ClinDeptID"]),
+                null_if_empty(row["Rpt1SpecialtyID"]),
+                null_if_empty(row["Rpt1DisplayDoctorName"]),
+                null_if_empty(row["Rpt2ClinDeptID"]),
+                null_if_empty(row["Rpt3ClinDeptID"]),
+                null_if_empty(row["Rpt4ClinDeptID"]),
+                null_if_empty(row["Rpt5ClinDeptID"]),
+                null_if_empty(row["Rpt6ClinDeptID"]),
                 null_if_empty(row["DoctorID"]),
-                null_if_empty(row["DisplayDoctorName"]),
                 null_if_empty(row["TimeSlotID"]),
                 null_if_empty(row["Room"]),
                 row["DayOfWeek"],

@@ -23,8 +23,6 @@ def main():
 
     run("scripts/fix_date_format.py")
 
-    run("scripts/generate_schedule.py")
-
     print("\n====== Setup Completed ======")
 
 if __name__ == "__main__":

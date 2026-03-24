@@ -1,38 +1,41 @@
 import sqlite3
 import csv
+from pathlib import Path
 from settings import DB_PATH, CSV_DIR
-
-MASTER_TABLES = [
-    ("M_ClinicalDepartment", "M_ClinicalDepartment.csv"),
-    ("M_Doctor", "M_Doctor.csv"),
-    ("M_ScheduleChangeType", "M_ScheduleChangeType.csv"),
-    ("M_Specialty", "M_Specialty.csv")
-]
 
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-for table, filename in MASTER_TABLES:
+print("=== Import Master CSV ===")
 
-    path = CSV_DIR / filename
-    print(f"Importing {filename} → {table}")
+# M_で始まるCSVを自動取得
+csv_files = sorted(CSV_DIR.glob("M_*.csv"))
 
-    with open(path, encoding="utf-8-sig") as f:
+for csv_path in csv_files:
+
+    table_name = csv_path.stem
+
+    print(f"Importing {csv_path.name} → {table_name}")
+
+    with open(csv_path, encoding="utf-8-sig") as f:
 
         reader = csv.DictReader(f)
 
         columns = reader.fieldnames
+
         col_str = ",".join(columns)
 
         placeholders = ",".join(["?"] * len(columns))
 
         sql = f"""
-        INSERT INTO {table} ({col_str})
+        INSERT INTO {table_name} ({col_str})
         VALUES ({placeholders})
         """
 
         for row in reader:
+
             values = [row[col] for col in columns]
+
             cursor.execute(sql, values)
 
 conn.commit()
