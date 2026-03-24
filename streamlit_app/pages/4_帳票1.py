@@ -28,21 +28,32 @@ df = pd.read_sql(query, conn, params={"target_month": target_month})
 if df.empty:
     st.warning("対象月のデータがありません")
 else:
-    display_df = df.rename(columns={
-        "ClinDeptName": "診療科",
-        "TimeSlotName": "時間",
-        "Room": "診察室",
-        "Mon": "月",
-        "Tue": "火",
-        "Wed": "水",
-        "Thu": "木",
-        "Fri": "金",
-        "Sat": "土",
-    })
+    display_mode = st.radio(
+        "画面表示形式",
+        ["改行表示", "区切り表示（ / ）"],
+        horizontal=True,
+    )
 
-    st.dataframe(display_df, use_container_width=True)
+    display_df = df.copy()
 
-    csv = display_df.to_csv(index=False).encode("utf-8-sig")
+    day_cols = ["月", "火", "水", "木", "金", "土"]
+    for col in day_cols:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].fillna("")
+
+    if display_mode == "区切り表示（ / ）":
+        for col in day_cols:
+            if col in display_df.columns:
+                display_df[col] = display_df[col].str.replace("\n", " / ")
+        st.dataframe(display_df, use_container_width=True)
+    else:
+        styled_df = display_df.style.set_properties(
+            subset=day_cols,
+            **{"white-space": "pre-wrap"}
+        )
+        st.dataframe(styled_df, use_container_width=True)
+
+    csv = df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         label="Excelダウンロード",
         data=csv,
