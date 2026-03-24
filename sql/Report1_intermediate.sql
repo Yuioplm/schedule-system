@@ -85,6 +85,7 @@ cell_tokens AS (
                 '5', '5・')
             , '・')
         END AS WeekLabel,
+
         COALESCE(NULLIF(s.Rpt1DisplayDoctorName, ''), d.DoctorName, '―') AS DoctorName,
         CASE
             WHEN s.SourceWeekPattern = '12345' THEN 0
