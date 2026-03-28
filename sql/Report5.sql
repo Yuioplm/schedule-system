@@ -31,6 +31,7 @@ LEFT JOIN M_ClinicalDepartment cd
 
 WHERE
     d.EmploymentType IN ('常勤', '非常勤')
+    AND sa.CalendarDate BETWEEN :start_date AND :end_date
     AND (
         (sa.Rpt5ClinDeptID IS NOT NULL AND rcd.ActiveFlag = 1)
         OR
