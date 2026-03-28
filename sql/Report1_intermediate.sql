@@ -22,7 +22,7 @@ matched_dates AS (
         cs.Rpt1DisplayDoctorName,
         cs.DoctorID,
         cs.TimeSlotID,
-        cs.Room,
+        COALESCE(cs.Room, '') AS Room,
         cs.WeekPattern AS SourceWeekPattern
     FROM month_dates md
     JOIN T_ConsultationSlot cs
@@ -85,12 +85,17 @@ cell_tokens AS (
                 '5', '5・')
             , '・')
         END AS WeekLabel,
-
         COALESCE(NULLIF(s.Rpt1DisplayDoctorName, ''), d.DoctorName, '―') AS DoctorName,
         CASE
             WHEN s.SourceWeekPattern = '12345' THEN 0
             ELSE CAST(SUBSTR(s.ActiveWeekPattern, 1, 1) AS INTEGER)
-        END AS TokenSortKey
+        END AS TokenSortKey,
+        CASE
+            WHEN d.EmploymentType = '常勤' THEN 0
+            WHEN d.EmploymentType = '非常勤' THEN 1
+            ELSE 2
+        END AS EmploymentSortKey,
+        COALESCE(s.DoctorID, 999999) AS DoctorSortID
     FROM slot_week_pattern s
     LEFT JOIN M_ClinicalDepartment cd
       ON cd.ClinDeptID = s.Rpt1ClinDeptID
@@ -98,6 +103,7 @@ cell_tokens AS (
       ON ts.TimeSlotID = s.TimeSlotID
     LEFT JOIN M_Doctor d
       ON d.DoctorID = s.DoctorID
+    WHERE cd.Rpt1Flag IN ('1', 1)
 ),
 cell_tokens_distinct AS (
     SELECT DISTINCT
@@ -113,7 +119,9 @@ cell_tokens_distinct AS (
             WHEN WeekLabel = '' THEN DoctorName
             ELSE WeekLabel || ' ' || DoctorName
         END AS TokenText,
-        TokenSortKey
+        TokenSortKey,
+        EmploymentSortKey,
+        DoctorSortID
     FROM cell_tokens
 ),
 cell_keys AS (
@@ -150,7 +158,7 @@ cell_agg AS (
                   AND t.TimeSlotID = k.TimeSlotID
                   AND t.Room = k.Room
                   AND t.DayOfWeek = k.DayOfWeek
-                ORDER BY t.TokenSortKey, t.TokenText
+                ORDER BY t.TokenSortKey, t.EmploymentSortKey, t.DoctorSortID, t.TokenText
             ) ordered
         ) AS CellText
     FROM cell_keys k
