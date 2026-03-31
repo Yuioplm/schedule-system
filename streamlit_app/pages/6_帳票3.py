@@ -63,6 +63,13 @@ if not df.empty:
             new_cols.append(col)
     pivot.columns = new_cols
 
+    total_row = {col: "" for col in pivot.columns}
+    total_row["診療科名"] = "合計"
+    numeric_cols = [col for col in pivot.columns if col != "診療科名"]
+    for col in numeric_cols:
+        total_row[col] = pivot[col].sum()
+    pivot = pd.concat([pivot, pd.DataFrame([total_row])], ignore_index=True)
+
     st.dataframe(pivot, use_container_width=True)
 
     csv = pivot.to_csv(index=False).encode("utf-8-sig")
