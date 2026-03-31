@@ -6,12 +6,12 @@
 
 ## 1. 機能概要（現時点）
 
-- **枠管理**: `T_ConsultationSlot` の検索・編集・新規登録（既存枠コピー対応）
+- **枠管理**: `T_ConsultationSlot` の検索・編集・新規登録（既存枠コピー対応、`Rpt1SpecialtyID`・`Rpt2~Rpt6ClinDeptID` 編集対応）
 - **予定検索**: `V_ScheduleFull` を検索し、対象行を変更入力へ受け渡し
 - **予定変更入力**: 通常枠の変更登録（`T_ScheduleChange`）
 - **臨時外来登録**: タブ画面から `T_TemporarySchedule` を登録
-- **帳票①**: 月指定で外来担当医表を表示し、CSV / HTML を出力
-- **帳票②〜⑤**: 期間指定で集計・ピボット出力（CSVダウンロード）
+- **帳票①**: 月指定で外来担当医表を表示し、CSV / HTML を出力（必要時に `＜SpecialtyName＞` 付与）
+- **帳票②〜⑤**: 期間指定で集計・ピボット出力（CSVダウンロード、帳票③〜⑤は末尾に合計行あり）
 - **マスタ管理**: 主要マスタ（診療科・医師・時間帯・専門・帳票診療科・変更種別）を画面編集
 
 ---
@@ -40,6 +40,7 @@ T_ConsultationSlot + M_Date
   - フィルタ（診療科/医師/曜日）
   - 既存枠編集（終了日未定=9999-12-31対応）
   - 新規枠登録（マスタ選択 + 既存枠コピー）
+  - 帳票関連キー編集（`Rpt1SpecialtyID`, `Rpt2~Rpt6ClinDeptID`）
 - `pages/2_予定検索.py`
   - 予定検索と変更対象選択
 - `pages/3_予定変更入力.py`
@@ -48,9 +49,11 @@ T_ConsultationSlot + M_Date
 - `pages/4_帳票1.py`
   - 帳票①表示
   - 画面表示モード切替
-  - CSV / HTML ダウンロード
+  - CSV / HTML ダウンロード（セル内に専門名 `＜...＞` 表示対応）
 - `pages/5_帳票2.py`〜`pages/8_帳票5.py`
   - 帳票②〜⑤
+  - 帳票③〜⑤は合計行を末尾表示
+  - 帳票⑤は「選択した年月が属する年度の4月〜選択年月末」で集計
 - `pages/9_マスタ管理.py`
   - 主要マスタの検索・編集・新規登録
 
@@ -113,6 +116,8 @@ streamlit run streamlit_app/app.py
 - **帳票条件の主軸**
   - 帳票①: `Rpt1ClinDeptID`, `Rpt1Flag`, `Rpt1Sort`
   - 帳票②〜⑤: 各 `RptXClinDeptID`, `RptXFlag`
+- **帳票⑤の期間仕様**
+  - 年月選択に対して、開始は該当年度の4/1、終了は選択年月の月末
 - **SQL変更時の原則**
   - SQLは `sql/` に集約
   - ページ側は `load_sql()` + `params` で実行

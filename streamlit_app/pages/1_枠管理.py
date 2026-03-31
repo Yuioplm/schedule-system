@@ -363,6 +363,13 @@ with st.form("create_slot_form"):
         index=_safe_option_index(new_doctor_options, default_doctor),
         format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
     )
+with filter_col2:
+    doctor_filter_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
+    doctor_filter = st.selectbox(
+        "医師フィルタ",
+        doctor_filter_options,
+        format_func=lambda x: "(全て)" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+    )
 with filter_col3:
     day_filter = st.selectbox("曜日フィルタ", ["(全て)"] + [label for _, label in DAY_OPTIONS])
 
@@ -486,6 +493,55 @@ else:
 
         edit_active = st.checkbox("有効", value=int(selected_row["ActiveFlag"]) == 1)
         submitted_update = st.form_submit_button("更新")
+
+        if submitted_update:
+            conn.execute(
+                """
+                UPDATE T_ConsultationSlot
+                SET
+                    Rpt1ClinDeptID = ?,
+                    Rpt1SpecialtyID = ?,
+                    Rpt2ClinDeptID = ?,
+                    Rpt3ClinDeptID = ?,
+                    Rpt4ClinDeptID = ?,
+                    Rpt5ClinDeptID = ?,
+                    Rpt6ClinDeptID = ?,
+                    DoctorID = ?,
+                    TimeSlotID = ?,
+                    Room = ?,
+                    DayOfWeek = ?,
+                    WeekPattern = ?,
+                    StartDate = ?,
+                    EndDate = ?,
+                    Rpt1DisplayDoctorName = ?,
+                    ActiveFlag = ?
+                WHERE SlotID = ?
+                """,
+                (
+                    edit_dept_id if edit_dept_id is None else int(edit_dept_id),
+                    edit_specialty_id if edit_specialty_id is None else int(edit_specialty_id),
+                    edit_rpt2_dept_id if edit_rpt2_dept_id is None else int(edit_rpt2_dept_id),
+                    edit_rpt3_dept_id if edit_rpt3_dept_id is None else int(edit_rpt3_dept_id),
+                    edit_rpt4_dept_id if edit_rpt4_dept_id is None else int(edit_rpt4_dept_id),
+                    edit_rpt5_dept_id if edit_rpt5_dept_id is None else int(edit_rpt5_dept_id),
+                    edit_rpt6_dept_id if edit_rpt6_dept_id is None else int(edit_rpt6_dept_id),
+                    edit_doctor_id if edit_doctor_id is None else int(edit_doctor_id),
+                    edit_timeslot_id if edit_timeslot_id is None else int(edit_timeslot_id),
+                    edit_room if edit_room != "" else None,
+                    edit_day if edit_day is None else int(edit_day),
+                    edit_weekpattern,
+                    str(edit_start),
+                    "9999-12-31" if edit_open_end else str(edit_end),
+                    edit_display_name if edit_display_name != "" else None,
+                    1 if edit_active else 0,
+                    int(selected_slot_id),
+                ),
+            )
+            conn.commit()
+            st.success("枠を更新しました。画面を再読み込みすると一覧に反映されます。")
+
+st.divider()
+st.subheader("新規枠追加（検索選択式）")
 
     new_timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
     new_timeslot_id = st.selectbox(
