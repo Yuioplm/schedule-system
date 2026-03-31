@@ -30,6 +30,14 @@ end_date = end_date.strftime("%Y-%m-%d")
 query = load_sql("Report3.sql")
 df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
 
+# DBの日付表現ゆれ対策（文字列比較に依存しないための再フィルタ）
+if not df.empty:
+    df["CalendarDate"] = pd.to_datetime(df["CalendarDate"], errors="coerce")
+    start_ts = pd.to_datetime(start_date)
+    end_ts = pd.to_datetime(end_date)
+    df = df[(df["CalendarDate"] >= start_ts) & (df["CalendarDate"] <= end_ts)]
+    df["CalendarDate"] = df["CalendarDate"].dt.strftime("%Y-%m-%d")
+
 if not df.empty:
     df["Rpt3ClinDeptID"] = df["Rpt3ClinDeptID"].fillna(0)
     pivot = df.pivot_table(

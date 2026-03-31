@@ -54,7 +54,7 @@ with tab1:
             """
             SELECT DoctorID, DoctorName, Department, EmploymentType
             FROM M_Doctor
-            ORDER BY Department, EmploymentType, DoctorName
+            ORDER BY DoctorID
             """,
             conn,
         )
@@ -71,18 +71,14 @@ with tab1:
         if selected_employment != "":
             filtered_doctor_df = filtered_doctor_df[filtered_doctor_df["EmploymentType"] == selected_employment]
 
-        doctor_name_options = [""] + filtered_doctor_df["DoctorName"].tolist()
-        selected_doctor_name = st.selectbox("代診医", doctor_name_options)
+        doctor_id_options = [None] + filtered_doctor_df["DoctorID"].astype(int).tolist()
+        selected_doctor_id = st.selectbox(
+            "代診医",
+            doctor_id_options,
+            format_func=lambda x: "未選択" if x is None else f"{x}: {filtered_doctor_df.loc[filtered_doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+        )
 
-        if selected_doctor_name == "":
-            new_doctor_id = None
-        else:
-            new_doctor_id = int(
-                filtered_doctor_df.loc[
-                    filtered_doctor_df["DoctorName"] == selected_doctor_name,
-                    "DoctorID",
-                ].iloc[0]
-            )
+        new_doctor_id = selected_doctor_id
 
         new_timeslot_id = None
         new_room = None
@@ -134,11 +130,11 @@ with tab2:
     st.caption("臨時外来（T_TemporarySchedule）を登録します")
 
     dept_df = pd.read_sql(
-        "SELECT ClinDeptID, ClinDeptName FROM M_ClinicalDepartment WHERE ActiveFlag = 1 ORDER BY Rpt1Sort, ClinDeptID",
+        "SELECT ClinDeptID, ClinDeptName FROM M_ClinicalDepartment WHERE ActiveFlag = 1 ORDER BY ClinDeptID",
         conn,
     )
     doctor_df = pd.read_sql(
-        "SELECT DoctorID, DoctorName, Department, EmploymentType FROM M_Doctor WHERE ActiveFlag = 1 ORDER BY Department, EmploymentType, DoctorName",
+        "SELECT DoctorID, DoctorName, Department, EmploymentType FROM M_Doctor WHERE ActiveFlag = 1 ORDER BY DoctorID",
         conn,
     )
     timeslot_df = pd.read_sql(
@@ -151,14 +147,14 @@ with tab2:
 
         temp_timeslot = st.selectbox(
             "時間帯",
-            timeslot_df["TimeSlotID"].astype(int).tolist(),
-            format_func=lambda x: f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
+            [None] + timeslot_df["TimeSlotID"].astype(int).tolist(),
+            format_func=lambda x: "未選択" if x is None else f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
         )
 
         temp_dept = st.selectbox(
             "診療科",
-            dept_df["ClinDeptID"].astype(int).tolist(),
-            format_func=lambda x: f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+            [None] + dept_df["ClinDeptID"].astype(int).tolist(),
+            format_func=lambda x: "未選択" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
         )
 
         dep_options = ["(全て)"] + sorted([x for x in doctor_df["Department"].dropna().unique().tolist()])
@@ -179,11 +175,7 @@ with tab2:
             format_func=lambda x: "未設定" if x is None else f"{x}: {temp_doctor_df.loc[temp_doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
         )
 
-        default_display = ""
-        if temp_doctor_id is not None:
-            default_display = temp_doctor_df.loc[temp_doctor_df["DoctorID"] == temp_doctor_id, "DoctorName"].iloc[0]
-
-        temp_display_name = st.text_input("帳票①表示名（任意）", value=default_display)
+        temp_display_name = st.text_input("帳票①表示名（任意）", value="")
         temp_room = st.text_input("診察室")
         temp_detail = st.text_area("変更内容")
         temp_reason = st.text_area("備考")
@@ -191,33 +183,36 @@ with tab2:
 
         submitted_temp = st.form_submit_button("臨時外来を登録")
         if submitted_temp:
-            conn.execute(
-                """
-                INSERT INTO T_TemporarySchedule
-                (
-                    CalendarDate,
-                    TimeSlotID,
-                    Rpt1ClinDeptID,
-                    Rpt1DisplayDoctorName,
-                    DoctorID,
-                    Room,
-                    ChangeDetail,
-                    Reason,
-                    ActiveFlag
+            if temp_timeslot is None or temp_dept is None:
+                st.error("時間帯・診療科は必須です。未選択を解除してください。")
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO T_TemporarySchedule
+                    (
+                        CalendarDate,
+                        TimeSlotID,
+                        Rpt1ClinDeptID,
+                        Rpt1DisplayDoctorName,
+                        DoctorID,
+                        Room,
+                        ChangeDetail,
+                        Reason,
+                        ActiveFlag
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(cal_date),
+                        int(temp_timeslot),
+                        int(temp_dept),
+                        temp_display_name if temp_display_name != "" else None,
+                        temp_doctor_id,
+                        temp_room if temp_room != "" else None,
+                        temp_detail if temp_detail != "" else None,
+                        temp_reason if temp_reason != "" else None,
+                        1 if temp_active else 0,
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(cal_date),
-                    int(temp_timeslot),
-                    int(temp_dept),
-                    temp_display_name if temp_display_name != "" else None,
-                    temp_doctor_id,
-                    temp_room if temp_room != "" else None,
-                    temp_detail if temp_detail != "" else None,
-                    temp_reason if temp_reason != "" else None,
-                    1 if temp_active else 0,
-                ),
-            )
-            conn.commit()
-            st.success("臨時外来を登録しました")
+                conn.commit()
+                st.success("臨時外来を登録しました")

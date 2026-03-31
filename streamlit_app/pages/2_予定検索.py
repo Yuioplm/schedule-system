@@ -11,24 +11,30 @@ st.title("予定検索")
 conn = get_conn()
 
 # ==========================
-# 検索条件用の候補取得
+# 検索条件用の候補取得（ID昇順）
 # ==========================
-dept_df = pd.read_sql("""
-SELECT DISTINCT ClinDeptName
-FROM V_ScheduleFull
-WHERE ClinDeptName IS NOT NULL
-ORDER BY ClinDeptName
-""", conn)
+dept_df = pd.read_sql(
+    """
+    SELECT ClinDeptID, ClinDeptName
+    FROM M_ClinicalDepartment
+    WHERE ActiveFlag = 1
+    ORDER BY ClinDeptID
+    """,
+    conn,
+)
 
-doctor_df = pd.read_sql("""
-SELECT DISTINCT DoctorName
-FROM V_ScheduleFull
-WHERE DoctorName IS NOT NULL
-ORDER BY DoctorName
-""", conn)
+doctor_df = pd.read_sql(
+    """
+    SELECT DoctorID, DoctorName
+    FROM M_Doctor
+    WHERE ActiveFlag = 1
+    ORDER BY DoctorID
+    """,
+    conn,
+)
 
-dept_options = [""] + dept_df["ClinDeptName"].tolist()
-doctor_options = [""] + doctor_df["DoctorName"].tolist()
+dept_options = [None] + dept_df["ClinDeptID"].astype(int).tolist()
+doctor_options = [None] + doctor_df["DoctorID"].astype(int).tolist()
 
 # ==========================
 # 検索条件
@@ -43,9 +49,17 @@ with col2:
 col3, col4 = st.columns(2)
 
 with col3:
-    selected_dept = st.selectbox("診療科名", dept_options)
+    selected_dept = st.selectbox(
+        "診療科名",
+        dept_options,
+        format_func=lambda x: "(全て)" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+    )
 with col4:
-    selected_doctor = st.selectbox("医師名", doctor_options)
+    selected_doctor = st.selectbox(
+        "医師名",
+        doctor_options,
+        format_func=lambda x: "(全て)" if x is None else f"{x}: {doctor_df.loc[doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+    )
 
 # ==========================
 # SQL組み立て
@@ -67,13 +81,15 @@ WHERE CalendarDate BETWEEN ? AND ?
 
 params = [str(date_from), str(date_to)]
 
-if selected_dept != "":
+if selected_dept is not None:
+    selected_dept_name = dept_df.loc[dept_df["ClinDeptID"] == selected_dept, "ClinDeptName"].iloc[0]
     query += " AND ClinDeptName = ?"
-    params.append(selected_dept)
+    params.append(selected_dept_name)
 
-if selected_doctor != "":
+if selected_doctor is not None:
+    selected_doctor_name = doctor_df.loc[doctor_df["DoctorID"] == selected_doctor, "DoctorName"].iloc[0]
     query += " AND DoctorName = ?"
-    params.append(selected_doctor)
+    params.append(selected_doctor_name)
 
 query += """
 ORDER BY

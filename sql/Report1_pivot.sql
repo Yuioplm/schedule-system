@@ -19,6 +19,7 @@ matched_dates AS (
         md.WeekNumber,
         cs.SlotID,
         cs.Rpt1ClinDeptID,
+        cs.Rpt1SpecialtyID,
         cs.Rpt1DisplayDoctorName,
         cs.DoctorID,
         cs.TimeSlotID,
@@ -36,6 +37,7 @@ slot_week_pattern AS (
         YearMonth,
         SlotID,
         Rpt1ClinDeptID,
+        Rpt1SpecialtyID,
         Rpt1DisplayDoctorName,
         DoctorID,
         TimeSlotID,
@@ -54,6 +56,7 @@ slot_week_pattern AS (
         YearMonth,
         SlotID,
         Rpt1ClinDeptID,
+        Rpt1SpecialtyID,
         Rpt1DisplayDoctorName,
         DoctorID,
         TimeSlotID,
@@ -87,6 +90,10 @@ cell_tokens AS (
         END AS WeekLabel,
         COALESCE(NULLIF(s.Rpt1DisplayDoctorName, ''), d.DoctorName, '―') AS DoctorName,
         CASE
+            WHEN sp.SpecialtyName IS NULL OR TRIM(sp.SpecialtyName) = '' THEN ''
+            ELSE '＜' || sp.SpecialtyName || '＞'
+        END AS SpecialtyLabel,
+        CASE
             WHEN s.SourceWeekPattern = '12345' THEN 0
             ELSE CAST(SUBSTR(s.ActiveWeekPattern, 1, 1) AS INTEGER)
         END AS TokenSortKey,
@@ -103,6 +110,8 @@ cell_tokens AS (
       ON ts.TimeSlotID = s.TimeSlotID
     LEFT JOIN M_Doctor d
       ON d.DoctorID = s.DoctorID
+    LEFT JOIN M_Specialty sp
+      ON sp.SpecialtyID = s.Rpt1SpecialtyID
     WHERE cd.Rpt1Flag IN ('1', 1)
 ),
 cell_tokens_distinct AS (
@@ -116,8 +125,8 @@ cell_tokens_distinct AS (
         DayOfWeek,
         DeptSort,
         CASE
-            WHEN WeekLabel = '' THEN DoctorName
-            ELSE WeekLabel || ' ' || DoctorName
+            WHEN WeekLabel = '' THEN DoctorName || SpecialtyLabel
+            ELSE WeekLabel || ' ' || DoctorName || SpecialtyLabel
         END AS TokenText,
         TokenSortKey,
         EmploymentSortKey,
