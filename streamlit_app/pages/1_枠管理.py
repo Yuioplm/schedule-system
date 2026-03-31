@@ -363,6 +363,28 @@ with st.form("create_slot_form"):
         index=_safe_option_index(new_doctor_options, default_doctor),
         format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
     )
+with filter_col3:
+    day_filter = st.selectbox("曜日フィルタ", ["(全て)"] + [label for _, label in DAY_OPTIONS])
+
+view_df = slot_df.copy()
+if dept_filter != "(全て)":
+    view_df = view_df[view_df["ClinDeptName"] == dept_filter]
+if doctor_filter != "(全て)":
+    view_df = view_df[view_df["DoctorName"] == doctor_filter]
+if day_filter != "(全て)":
+    day_num = next((v for v, l in DAY_OPTIONS if l == day_filter), None)
+    view_df = view_df[view_df["DayOfWeek"] == day_num]
+
+show_df = view_df.copy()
+show_df["DayOfWeek"] = show_df["DayOfWeek"].apply(_day_label)
+st.dataframe(show_df, use_container_width=True)
+
+if view_df.empty:
+    st.info("条件に合う枠がありません。")
+else:
+    slot_choices = view_df["SlotID"].astype(int).tolist()
+    selected_slot_id = st.selectbox("編集対象SlotID", slot_choices)
+    selected_row = view_df.loc[view_df["SlotID"] == selected_slot_id].iloc[0]
 
     new_timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
     new_timeslot_id = st.selectbox(
