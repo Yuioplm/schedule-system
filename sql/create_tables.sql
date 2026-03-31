@@ -7,6 +7,7 @@ CREATE TABLE M_ClinicalDepartment (
     ClinDeptID INTEGER PRIMARY KEY,
     Category TEXT,
     ClinDeptName TEXT NOT NULL,
+    Rpt1Sort INTEGER,
     Rpt1Flag TEXT,
     Rpt2Flag TEXT,
     Rpt3Flag TEXT,
