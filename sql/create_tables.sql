@@ -335,6 +335,7 @@ CREATE TABLE T_TemporarySchedule (
     Reason TEXT,
 
     ActiveFlag INTEGER DEFAULT 1,
+    Rpt2Flag INTEGER DEFAULT 1,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (TimeSlotID) REFERENCES M_TimeSlot(TimeSlotID),
@@ -420,6 +421,7 @@ SELECT
 FROM T_TemporarySchedule ts
 
 WHERE ts.ActiveFlag = 1
+  AND COALESCE(CAST(ts.Rpt2Flag AS INTEGER), 1) = 1
 
 ORDER BY
     CalendarDate,

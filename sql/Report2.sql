@@ -5,14 +5,12 @@ WITH LatestChange AS (
     SELECT sc1.*
     FROM T_ScheduleChange sc1
     WHERE sc1.ActiveFlag = 1
-      AND sc1.Rpt2Flag = 1
       AND sc1.ChangeID = (
           SELECT MAX(sc2.ChangeID)
           FROM T_ScheduleChange sc2
           WHERE sc2.CalendarDate = sc1.CalendarDate
             AND sc2.SlotID = sc1.SlotID
             AND sc2.ActiveFlag = 1
-            AND sc2.Rpt2Flag = 1
       )
 )
 
@@ -66,6 +64,8 @@ LEFT JOIN M_Doctor d
     ON COALESCE(lc.NewDoctorID, sb.DoctorID) = d.DoctorID
 
 WHERE
+    COALESCE(CAST(lc.Rpt2Flag AS INTEGER), 1) = 1
+    AND
     d.EmploymentType IN ('常勤', '非常勤')
     AND lc.CalendarDate >= :start_date
     AND (
@@ -121,6 +121,7 @@ LEFT JOIN M_Doctor d
 
 WHERE
     tsch.ActiveFlag = 1
+    AND COALESCE(CAST(tsch.Rpt2Flag AS INTEGER), 1) = 1
     AND d.EmploymentType IN ('常勤', '非常勤')
     AND tsch.CalendarDate >= :start_date
     AND (
