@@ -106,6 +106,17 @@ python set_up.py
 streamlit run streamlit_app/app.py
 ```
 
+初回起動で `Welcome to Streamlit!` のメール入力プロンプトが止まる問題を避けるため、
+このリポジトリでは `.streamlit/config.toml` で `gatherUsageStats = false` を設定し、
+`.streamlit/credentials.toml` で `email = ""` を明示しています。
+起動後はターミナルに表示される `Local URL`（通常 `http://localhost:8501`）へアクセスしてください。
+
+それでも同メッセージが表示される場合は、以下のようにオプションを明示して起動してください。
+
+```bash
+streamlit run streamlit_app/app.py --browser.gatherUsageStats false --server.headless true
+```
+
 ---
 
 ## 6. よく使う運用ポイント
