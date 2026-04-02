@@ -151,6 +151,7 @@ with tab2:
     temp_doctor_df = doctor_df.copy()
     if selected_dep != "(全て)":
         temp_doctor_df = temp_doctor_df[temp_doctor_df["Department"] == selected_dep]
+
     if selected_emp != "(全て)":
         temp_doctor_df = temp_doctor_df[temp_doctor_df["EmploymentType"] == selected_emp]
 
@@ -176,7 +177,7 @@ with tab2:
             format_func=lambda x: "未選択" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
         )
 
-        temp_display_name = st.text_input("帳票①表示名（任意）", value="")
+        temp_rpt2_before_doctor = st.text_input("帳票➁変更前（任意）", value="", help="帳票➁ 予定変更一覧の「変更前医師」に出力されます")
         temp_room = st.text_input("診察室")
         temp_detail = st.text_area("変更内容")
         temp_reason = st.text_area("備考")
@@ -218,7 +219,7 @@ with tab2:
                         str(cal_date),
                         int(temp_timeslot),
                         int(temp_dept),
-                        temp_display_name if temp_display_name != "" else None,
+                        temp_rpt2_before_doctor if temp_rpt2_before_doctor != "" else None,
                         temp_doctor_id,
                         temp_room if temp_room != "" else None,
                         temp_detail if temp_detail != "" else None,
