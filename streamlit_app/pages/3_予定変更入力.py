@@ -6,8 +6,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 
-st.set_page_config(layout="wide")
-
 st.title("予定変更入力")
 conn = get_conn()
 
@@ -89,6 +87,7 @@ with tab1:
 
         hide_from_report2 = st.checkbox(
             "予定変更一覧にて非表示",
+            key="normal_hide_from_report2",
             help="チェックすると帳票➁ 予定変更一覧に表示されません",
         )
         changed_by = st.text_input("ChangedBy")
@@ -182,6 +181,16 @@ with tab2:
         temp_detail = st.text_area("変更内容")
         temp_reason = st.text_area("備考")
         temp_active = st.checkbox("有効", value=True)
+        temp_hide_from_report2 = st.checkbox(
+            "予定変更一覧にて非表示",
+            key="temp_hide_from_report2",
+            help="チェックすると帳票➁ 予定変更一覧に表示されません",
+        )
+
+        temp_columns = pd.read_sql("PRAGMA table_info(T_TemporarySchedule)", conn)["name"].tolist()
+        if "Rpt2Flag" not in temp_columns:
+            conn.execute("ALTER TABLE T_TemporarySchedule ADD COLUMN Rpt2Flag INTEGER DEFAULT 1")
+            conn.commit()
 
         submitted_temp = st.form_submit_button("臨時外来を登録")
         if submitted_temp:
@@ -200,9 +209,10 @@ with tab2:
                         Room,
                         ChangeDetail,
                         Reason,
-                        ActiveFlag
+                        ActiveFlag,
+                        Rpt2Flag
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(cal_date),
@@ -214,6 +224,7 @@ with tab2:
                         temp_detail if temp_detail != "" else None,
                         temp_reason if temp_reason != "" else None,
                         1 if temp_active else 0,
+                        0 if temp_hide_from_report2 else 1,
                     ),
                 )
                 conn.commit()
