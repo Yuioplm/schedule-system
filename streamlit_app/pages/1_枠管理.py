@@ -177,6 +177,7 @@ show_df = view_df.copy()
 show_df["DayOfWeek"] = show_df["DayOfWeek"].apply(_day_label)
 st.dataframe(show_df, use_container_width=True)
 
+selected_row = None
 if view_df.empty:
     st.info("条件に合う枠がありません。")
 else:
@@ -334,8 +335,12 @@ else:
 st.divider()
 st.subheader("新規枠追加（検索選択式）")
 
-use_selected_as_default = st.checkbox("編集対象の枠を初期値としてコピーする", value=False)
-default_row = selected_row if (use_selected_as_default and not view_df.empty) else None
+use_selected_as_default = st.checkbox(
+    "編集対象の枠を初期値としてコピーする",
+    value=False,
+    disabled=view_df.empty,
+)
+default_row = selected_row if (use_selected_as_default and selected_row is not None) else None
 
 with st.form("create_slot_form"):
     default_dept = int(default_row["Rpt1ClinDeptID"]) if default_row is not None and not pd.isna(default_row["Rpt1ClinDeptID"]) else None
@@ -543,6 +548,7 @@ else:
 st.divider()
 st.subheader("新規枠追加（検索選択式）")
 
+with st.form("create_slot_form"):
     new_timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
     new_timeslot_id = st.selectbox(
         "時間帯",

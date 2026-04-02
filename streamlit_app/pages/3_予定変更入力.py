@@ -6,6 +6,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 
+st.set_page_config(layout="wide")
+
 st.title("予定変更入力")
 conn = get_conn()
 
@@ -87,7 +89,6 @@ with tab1:
 
         hide_from_report2 = st.checkbox(
             "予定変更一覧にて非表示",
-            key="normal_hide_from_report2",
             help="チェックすると帳票➁ 予定変更一覧に表示されません",
         )
         changed_by = st.text_input("ChangedBy")
@@ -143,20 +144,6 @@ with tab2:
         conn,
     )
 
-    cal_date = st.date_input("日付")
-
-    temp_timeslot = st.selectbox(
-        "時間帯",
-        [None] + timeslot_df["TimeSlotID"].astype(int).tolist(),
-        format_func=lambda x: "未選択" if x is None else f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
-    )
-
-    temp_dept = st.selectbox(
-        "診療科",
-        [None] + dept_df["ClinDeptID"].astype(int).tolist(),
-        format_func=lambda x: "未選択" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
-    )
-
     dep_options = ["(全て)"] + sorted([x for x in doctor_df["Department"].dropna().unique().tolist()])
     selected_dep = st.selectbox("医師検索_部署", dep_options)
     emp_options = ["(全て)"] + sorted([x for x in doctor_df["EmploymentType"].dropna().unique().tolist()])
@@ -175,55 +162,59 @@ with tab2:
         format_func=lambda x: "未設定" if x is None else f"{x}: {temp_doctor_df.loc[temp_doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
     )
 
-    temp_display_name = st.text_input("帳票①表示名（任意）", value="")
-    temp_room = st.text_input("診察室")
-    temp_detail = st.text_area("変更内容")
-    temp_reason = st.text_area("備考")
-    temp_active = st.checkbox("有効", value=True)
-    temp_hide_from_report2 = st.checkbox(
-        "予定変更一覧にて非表示",
-        key="temp_hide_from_report2",
-        help="チェックすると帳票➁ 予定変更一覧に表示されません",
-    )
+    with st.form("temporary_outpatient_form"):
+        cal_date = st.date_input("日付")
 
-    temp_columns = pd.read_sql("PRAGMA table_info(T_TemporarySchedule)", conn)["name"].tolist()
-    if "Rpt2Flag" not in temp_columns:
-        conn.execute("ALTER TABLE T_TemporarySchedule ADD COLUMN Rpt2Flag INTEGER DEFAULT 1")
-        conn.commit()
+        temp_timeslot = st.selectbox(
+            "時間帯",
+            [None] + timeslot_df["TimeSlotID"].astype(int).tolist(),
+            format_func=lambda x: "未選択" if x is None else f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
+        )
 
-    if st.button("臨時外来を登録"):
-        if temp_timeslot is None or temp_dept is None:
-            st.error("時間帯・診療科は必須です。未選択を解除してください。")
-        else:
-            conn.execute(
-                """
-                INSERT INTO T_TemporarySchedule
-                (
-                    CalendarDate,
-                    TimeSlotID,
-                    Rpt1ClinDeptID,
-                    Rpt1DisplayDoctorName,
-                    DoctorID,
-                    Room,
-                    ChangeDetail,
-                    Reason,
-                    ActiveFlag,
-                    Rpt2Flag
+        temp_dept = st.selectbox(
+            "診療科",
+            [None] + dept_df["ClinDeptID"].astype(int).tolist(),
+            format_func=lambda x: "未選択" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+        )
+
+        temp_display_name = st.text_input("帳票①表示名（任意）", value="")
+        temp_room = st.text_input("診察室")
+        temp_detail = st.text_area("変更内容")
+        temp_reason = st.text_area("備考")
+        temp_active = st.checkbox("有効", value=True)
+
+        submitted_temp = st.form_submit_button("臨時外来を登録")
+        if submitted_temp:
+            if temp_timeslot is None or temp_dept is None:
+                st.error("時間帯・診療科は必須です。未選択を解除してください。")
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO T_TemporarySchedule
+                    (
+                        CalendarDate,
+                        TimeSlotID,
+                        Rpt1ClinDeptID,
+                        Rpt1DisplayDoctorName,
+                        DoctorID,
+                        Room,
+                        ChangeDetail,
+                        Reason,
+                        ActiveFlag
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(cal_date),
+                        int(temp_timeslot),
+                        int(temp_dept),
+                        temp_display_name if temp_display_name != "" else None,
+                        temp_doctor_id,
+                        temp_room if temp_room != "" else None,
+                        temp_detail if temp_detail != "" else None,
+                        temp_reason if temp_reason != "" else None,
+                        1 if temp_active else 0,
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(cal_date),
-                    int(temp_timeslot),
-                    int(temp_dept),
-                    temp_display_name if temp_display_name != "" else None,
-                    temp_doctor_id,
-                    temp_room if temp_room != "" else None,
-                    temp_detail if temp_detail != "" else None,
-                    temp_reason if temp_reason != "" else None,
-                    1 if temp_active else 0,
-                    0 if temp_hide_from_report2 else 1,
-                ),
-            )
-            conn.commit()
-            st.success("臨時外来を登録しました")
+                conn.commit()
+                st.success("臨時外来を登録しました")
