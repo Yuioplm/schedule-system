@@ -227,15 +227,6 @@ else:
         mime="text/csv",
     )
 
-    template_file = st.file_uploader(
-        "帳票①Excelテンプレート（.xlsx）",
-        type=["xlsx"],
-        help=(
-            "テンプレートをアップロードすると、見た目（罫線・結合セル）を維持したまま、"
-            "担当医表の値を該当セルへ流し込んだExcelを出力します。"
-        ),
-    )
-
     st.markdown("#### テンプレート反映設定")
     st.info(
         "Excelテンプレート（.xlsx）にプレースホルダ（例: {{月|内科|午前|10}}）を入力しておくと、"
@@ -255,6 +246,15 @@ else:
             5. `*` はワイルドカードです（例: 部屋番号を問わない場合は `{{月|内科|午前|*}}`）。  
             """
         )
+
+    template_file = st.file_uploader(
+        "帳票①Excelテンプレート（.xlsx）",
+        type=["xlsx"],
+        help=(
+            "テンプレートをアップロードすると、見た目（罫線・結合セル）を維持したまま、"
+            "担当医表の値を該当セルへ流し込んだExcelを出力します。"
+        ),
+    )
 
     if template_file is not None:
         template_bytes = template_file.getvalue()
