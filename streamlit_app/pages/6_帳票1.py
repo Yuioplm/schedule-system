@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import sys
-import html
 from io import BytesIO
 import re
 
@@ -176,158 +175,6 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
 
             write_value(cell.coordinate, replacement)
 
-def build_report1_html(df: pd.DataFrame, target_month: str) -> str:
-    day_cols = ["月", "火", "水", "木", "金", "土"]
-    display_df = df.copy()
-    columns = list(display_df.columns)
-    center_col = "センター" if "センター" in display_df.columns else None
-    dept_col = "診療科" if "診療科" in display_df.columns else None
-    time_col = "時間" if "時間" in display_df.columns else None
-
-    def same_value(a, b) -> bool:
-        return (pd.isna(a) and pd.isna(b)) or (a == b)
-
-    row_count = len(display_df)
-    center_span_start = {}
-    dept_span_start = {}
-    center_run_end = {}
-    dept_run_end = {}
-    time_span_start = {}
-
-    if center_col is not None and row_count > 0:
-        i = 0
-        while i < row_count:
-            j = i + 1
-            while j < row_count and same_value(display_df.iloc[j][center_col], display_df.iloc[i][center_col]):
-                j += 1
-            center_span_start[i] = j - i
-            center_run_end[i] = j
-            i = j
-
-    if center_col is not None and dept_col is not None and row_count > 0:
-        for center_start, center_end in center_run_end.items():
-            k = center_start
-            while k < center_end:
-                l = k + 1
-                while l < center_end and same_value(display_df.iloc[l][dept_col], display_df.iloc[k][dept_col]):
-                    l += 1
-                dept_span_start[k] = l - k
-                dept_run_end[k] = l
-                k = l
-
-    if dept_col is not None and time_col is not None and row_count > 0:
-        for dept_start, dept_end in dept_run_end.items():
-            m = dept_start
-            while m < dept_end:
-                n = m + 1
-                while n < dept_end and same_value(display_df.iloc[n][time_col], display_df.iloc[m][time_col]):
-                    n += 1
-                time_span_start[m] = n - m
-                m = n
-
-    rows_html = []
-    for idx, row in display_df.iterrows():
-        cells = []
-        for col in columns:
-            if col == center_col:
-                if idx in center_span_start:
-                    value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
-                    span = center_span_start[idx]
-                    cells.append(f'<td class="label-cell center-cell" rowspan="{span}">{value}</td>')
-                continue
-
-            if col == dept_col:
-                if idx in dept_span_start:
-                    value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
-                    span = dept_span_start[idx]
-                    cells.append(f'<td class="label-cell dept-cell" rowspan="{span}">{value}</td>')
-                continue
-
-            if col == time_col:
-                if idx in time_span_start:
-                    value = "" if pd.isna(row[col]) else html.escape(str(row[col]))
-                    span = time_span_start[idx]
-                    cells.append(f'<td class="label-cell time-cell" rowspan="{span}">{value}</td>')
-                continue
-
-            value = "" if pd.isna(row[col]) else str(row[col])
-            escaped = html.escape(value).replace("\n", "<br>")
-            cell_class = "day-cell" if col in day_cols else "label-cell"
-            if col == "土":
-                cell_class += " sat"
-            cells.append(f'<td class="{cell_class}">{escaped}</td>')
-
-        rows_html.append("<tr>" + "".join(cells) + "</tr>")
-
-    header_html = "".join([f"<th>{html.escape(str(c))}</th>" for c in columns])
-    title_month = target_month.replace("-", "年", 1) + "月"
-
-    return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>外来担当医表 {html.escape(target_month)}</title>
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
-      margin: 20px;
-      color: #222;
-    }}
-    h1 {{
-      margin: 0 0 12px;
-      font-size: 22px;
-    }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: 14px;
-      line-height: 1.45;
-    }}
-    th, td {{
-      border: 1px solid #999;
-      padding: 8px 6px;
-      text-align: center;
-      vertical-align: middle;
-      word-break: break-word;
-    }}
-    th {{
-      background: #f3f3f3;
-      font-weight: 600;
-    }}
-    .label-cell {{
-      background: #fafafa;
-    }}
-    .center-cell, .dept-cell {{
-      background: #f0f7ff;
-      font-weight: 600;
-    }}
-    .time-cell {{
-      background: #f7fbf3;
-      font-weight: 600;
-    }}
-    .day-cell {{
-      white-space: pre-line;
-    }}
-    .sat {{
-      background: #f5f5f5;
-    }}
-  </style>
-</head>
-<body>
-  <h1>外来担当医表（{html.escape(title_month)}）</h1>
-  <table>
-    <thead>
-      <tr>{header_html}</tr>
-    </thead>
-    <tbody>
-      {''.join(rows_html)}
-    </tbody>
-  </table>
-</body>
-</html>"""
-
-
 st.set_page_config(layout="wide")
 st.title("帳票① 外来担当医表")
 
@@ -417,11 +264,6 @@ else:
         except Exception as exc:
             st.warning(f"テンプレートプレビューに失敗しました: {exc}")
 
-        st.markdown("##### データ参照プレビュー（データ行は1始まり）")
-        mapping_ref_df = df.copy().reset_index(drop=True)
-        mapping_ref_df.insert(0, "データ行", mapping_ref_df.index + 1)
-        st.dataframe(mapping_ref_df, use_container_width=True, hide_index=True)
-
         try:
             workbook = load_workbook(BytesIO(template_bytes))
             worksheet = workbook.active
@@ -440,17 +282,6 @@ else:
                 file_name=f"帳票①_外来担当医表_{target_month}_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-            st.caption(
-                "現在のマッピング: "
-                "年=F1, 月=G1, センター=B列, 診療科=C列, 時間=D列, 月〜土=E〜J列, 開始行=3行目"
-            )
         except Exception as exc:
             st.error(f"テンプレートExcelへの反映に失敗しました: {exc}")
 
-    html_content = build_report1_html(df, target_month)
-    st.download_button(
-        label="HTMLダウンロード",
-        data=html_content.encode("utf-8"),
-        file_name=f"帳票①_外来担当医表_{target_month}.html",
-        mime="text/html",
-    )
