@@ -4,6 +4,9 @@ import sys
 from pathlib import Path
 from io import BytesIO
 import re
+import zipfile
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
 
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple
@@ -12,7 +15,10 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 
 
-def apply_history_placeholder_mappings(worksheet, df: pd.DataFrame) -> None:
+def build_history_placeholder_replacements(template_bytes: bytes, df: pd.DataFrame) -> tuple[str, dict[str, str]]:
+    workbook = load_workbook(BytesIO(template_bytes))
+    worksheet = workbook.active
+
     def normalize_text(value) -> str:
         return "" if value is None else str(value).replace("\u3000", " ").strip()
 
@@ -24,10 +30,13 @@ def apply_history_placeholder_mappings(worksheet, df: pd.DataFrame) -> None:
             for col_num in range(min_col, max_col + 1):
                 merged_anchor_map[(row_num, col_num)] = anchor
 
+    replacements: dict[str, str] = {}
+
     def write_value(cell_ref: str, value) -> None:
         row_num, col_num = coordinate_to_tuple(cell_ref)
         anchor_row, anchor_col = merged_anchor_map.get((row_num, col_num), (row_num, col_num))
-        worksheet.cell(row=anchor_row, column=anchor_col, value=value)
+        anchor_ref = worksheet.cell(row=anchor_row, column=anchor_col).coordinate
+        replacements[anchor_ref] = value
 
     token_pattern = re.compile(r"^\s*\{\{\s*(.+?)\s*\}\}\s*$")
     for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=worksheet.max_column):
@@ -55,6 +64,93 @@ def apply_history_placeholder_mappings(worksheet, df: pd.DataFrame) -> None:
                 replacement = "" if pd.isna(src_value) else str(src_value)
 
             write_value(cell.coordinate, replacement)
+
+    return worksheet.title, replacements
+
+
+def resolve_sheet_path_by_title(template_bytes: bytes, sheet_title: str) -> str:
+    ns_main = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    ns_rel = {"rel": "http://schemas.openxmlformats.org/officeDocument/2006/relationships"}
+    ns_pkg = {"pkg": "http://schemas.openxmlformats.org/package/2006/relationships"}
+
+    with zipfile.ZipFile(BytesIO(template_bytes), "r") as source_zip:
+        workbook_root = ET.fromstring(source_zip.read("xl/workbook.xml"))
+        relation_root = ET.fromstring(source_zip.read("xl/_rels/workbook.xml.rels"))
+
+    sheet_rel_id = None
+    for sheet in workbook_root.findall(".//main:sheets/main:sheet", ns_main):
+        if sheet.attrib.get("name") == sheet_title:
+            sheet_rel_id = sheet.attrib.get(f"{{{ns_rel['rel']}}}id")
+            break
+
+    if not sheet_rel_id:
+        raise ValueError(f"対象シートが見つかりません: {sheet_title}")
+
+    for rel in relation_root.findall(".//pkg:Relationship", ns_pkg):
+        if rel.attrib.get("Id") != sheet_rel_id:
+            continue
+        target = rel.attrib.get("Target", "")
+        target = target.lstrip("/")
+        if target.startswith("xl/"):
+            return target
+        return f"xl/{target}"
+
+    raise ValueError(f"対象シートの参照先が見つかりません: {sheet_title}")
+
+
+def apply_replacements_preserve_media(template_bytes: bytes, sheet_title: str, replacements: dict[str, str]) -> bytes:
+    if not replacements:
+        return template_bytes
+
+    sheet_path = resolve_sheet_path_by_title(template_bytes=template_bytes, sheet_title=sheet_title)
+
+    source_buffer = BytesIO(template_bytes)
+    output_buffer = BytesIO()
+
+    with zipfile.ZipFile(source_buffer, "r") as source_zip, zipfile.ZipFile(output_buffer, "w") as output_zip:
+        for item in source_zip.infolist():
+            file_bytes = source_zip.read(item.filename)
+            if item.filename == sheet_path:
+                sheet_xml = file_bytes.decode("utf-8")
+                for cell_ref, replacement in replacements.items():
+                    sanitized_text = sanitize_xml_text(replacement)
+                    sheet_xml, _ = replace_cell_value_with_inline_string(
+                        sheet_xml=sheet_xml,
+                        cell_ref=cell_ref,
+                        text=sanitized_text,
+                    )
+                file_bytes = sheet_xml.encode("utf-8")
+
+            output_zip.writestr(item, file_bytes)
+
+    return output_buffer.getvalue()
+
+
+def sanitize_xml_text(value: str) -> str:
+    if not value:
+        return ""
+
+    # XML 1.0で許可されない文字を除去（タブ/改行/復帰は許可）
+    value = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", value)
+    value = re.sub(r"[\uD800-\uDFFF\uFFFE\uFFFF]", "", value)
+    return value
+
+
+def replace_cell_value_with_inline_string(sheet_xml: str, cell_ref: str, text: str) -> tuple[str, bool]:
+    cell_pattern = re.compile(
+        rf'(<c\b[^>]*\br="{re.escape(cell_ref)}"[^>]*)(?:\s*/>|>.*?</c>)',
+        flags=re.DOTALL,
+    )
+
+    escaped_text = escape(text)
+    text_attrs = ' xml:space="preserve"' if text[:1].isspace() or text[-1:].isspace() else ""
+
+    def repl(match: re.Match) -> str:
+        cell_start = re.sub(r'\s+t="[^"]*"', "", match.group(1))
+        return f'{cell_start} t="inlineStr"><is><t{text_attrs}>{escaped_text}</t></is></c>'
+
+    replaced_xml, count = cell_pattern.subn(repl, sheet_xml, count=1)
+    return replaced_xml, count > 0
 
 
 def ensure_output_history_table(conn) -> None:
@@ -516,15 +612,15 @@ else:
             if template_file is not None:
                 try:
                     template_bytes = template_file.getvalue()
-                    workbook = load_workbook(BytesIO(template_bytes))
-                    worksheet = workbook.active
-                    apply_history_placeholder_mappings(
-                        worksheet=worksheet,
+                    sheet_title, replacements = build_history_placeholder_replacements(
+                        template_bytes=template_bytes,
                         df=selected_export_df,
                     )
-                    output = BytesIO()
-                    workbook.save(output)
-                    filled_excel = output.getvalue()
+                    filled_excel = apply_replacements_preserve_media(
+                        template_bytes=template_bytes,
+                        sheet_title=sheet_title,
+                        replacements=replacements,
+                    )
                     download_clicked = st.download_button(
                         label="テンプレート反映版Excelダウンロード",
                         data=filled_excel,
