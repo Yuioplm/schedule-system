@@ -310,7 +310,7 @@ LEFT JOIN LatestOutputHistory oh
     ON src.登録種別 = oh.TargetType
     AND src.レコードID = oh.TargetID
 WHERE (? = 1 OR src.ActiveFlag = 1)
-ORDER BY 日付 DESC, 登録種別, レコードID DESC
+ORDER BY 日付 ASC, COALESCE(時間帯ID, SlotID, 9999) ASC, 登録種別, レコードID DESC
 """
 
 result_df = pd.read_sql(
