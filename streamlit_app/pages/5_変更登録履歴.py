@@ -2,12 +2,99 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+from io import BytesIO
+import re
+
+from openpyxl import load_workbook
+from openpyxl.utils.cell import coordinate_to_tuple
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 
+
+def apply_history_placeholder_mappings(worksheet, df: pd.DataFrame) -> None:
+    def normalize_text(value) -> str:
+        return "" if value is None else str(value).replace("\u3000", " ").strip()
+
+    merged_anchor_map = {}
+    for merged_range in worksheet.merged_cells.ranges:
+        min_col, min_row, max_col, max_row = merged_range.bounds
+        anchor = (min_row, min_col)
+        for row_num in range(min_row, max_row + 1):
+            for col_num in range(min_col, max_col + 1):
+                merged_anchor_map[(row_num, col_num)] = anchor
+
+    def write_value(cell_ref: str, value) -> None:
+        row_num, col_num = coordinate_to_tuple(cell_ref)
+        anchor_row, anchor_col = merged_anchor_map.get((row_num, col_num), (row_num, col_num))
+        worksheet.cell(row=anchor_row, column=anchor_col, value=value)
+
+    token_pattern = re.compile(r"^\s*\{\{\s*(.+?)\s*\}\}\s*$")
+    for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=worksheet.max_column):
+        for cell in row:
+            if not isinstance(cell.value, str):
+                continue
+            matched = token_pattern.match(cell.value)
+            if not matched:
+                continue
+
+            token = matched.group(1).strip()
+            replacement = ""
+            if token.startswith("固定:"):
+                replacement = token.split(":", 1)[1]
+            elif "#" in token:
+                col_name, row_str = token.split("#", 1)
+                col_name = normalize_text(col_name)
+                if col_name in df.columns and row_str.isdigit():
+                    row_idx = int(row_str) - 1
+                    if 0 <= row_idx < len(df):
+                        src_value = df.iloc[row_idx][col_name]
+                        replacement = "" if pd.isna(src_value) else str(src_value)
+            elif token in df.columns and len(df) > 0:
+                src_value = df.iloc[0][token]
+                replacement = "" if pd.isna(src_value) else str(src_value)
+
+            write_value(cell.coordinate, replacement)
+
+
+def ensure_output_history_table(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS T_ChangeNoticeOutputHistory (
+            OutputHistoryID INTEGER PRIMARY KEY,
+            TargetType TEXT NOT NULL,
+            TargetID INTEGER NOT NULL,
+            OutputBy TEXT,
+            OutputDate DATE,
+            CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours'))
+        )
+        """
+    )
+    conn.commit()
+
+
+def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_date: str) -> None:
+    if target_df.empty:
+        return
+    rows = [
+        (row["登録種別"], int(row["レコードID"]), output_by if output_by else None, output_date)
+        for _, row in target_df.iterrows()
+    ]
+    conn.executemany(
+        """
+        INSERT INTO T_ChangeNoticeOutputHistory (
+            TargetType, TargetID, OutputBy, OutputDate
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        rows,
+    )
+    conn.commit()
+
+
 st.title("変更登録履歴検索")
 conn = get_conn()
+ensure_output_history_table(conn)
 
 st.caption("予定変更入力・臨時外来登録の入力内容を、非表示設定を含めて確認できます。")
 
@@ -20,7 +107,24 @@ with col2:
 show_inactive = st.checkbox("無効化済み(ActiveFlag=0)も表示", value=False)
 
 query = """
-WITH NormalChange AS (
+WITH LatestOutputHistory AS (
+    SELECT
+        h.TargetType,
+        h.TargetID,
+        h.OutputBy,
+        h.OutputDate
+    FROM T_ChangeNoticeOutputHistory h
+    INNER JOIN (
+        SELECT
+            TargetType,
+            TargetID,
+            MAX(OutputHistoryID) AS MaxHistoryID
+        FROM T_ChangeNoticeOutputHistory
+        GROUP BY TargetType, TargetID
+    ) latest
+        ON h.OutputHistoryID = latest.MaxHistoryID
+),
+NormalChange AS (
     SELECT
         '通常枠変更' AS 登録種別,
         sc.ChangeID AS レコードID,
@@ -97,13 +201,19 @@ TemporaryChange AS (
         ON tsch.DoctorID = d.DoctorID
     WHERE tsch.CalendarDate BETWEEN ? AND ?
 )
-SELECT *
+SELECT
+    src.*,
+    oh.OutputBy AS 変更届出力者,
+    oh.OutputDate AS 変更届出力日
 FROM (
     SELECT * FROM NormalChange
     UNION ALL
     SELECT * FROM TemporaryChange
-)
-WHERE (? = 1 OR ActiveFlag = 1)
+ ) src
+LEFT JOIN LatestOutputHistory oh
+    ON src.登録種別 = oh.TargetType
+    AND src.レコードID = oh.TargetID
+WHERE (? = 1 OR src.ActiveFlag = 1)
 ORDER BY 日付 DESC, 登録種別, レコードID DESC
 """
 
@@ -112,13 +222,31 @@ result_df = pd.read_sql(
     conn,
     params=[str(date_from), str(date_to), str(date_from), str(date_to), 1 if show_inactive else 0],
 )
+if not result_df.empty:
+    result_df["日付"] = pd.to_datetime(result_df["日付"])
+    result_df["曜日"] = result_df["日付"].dt.day_name().map(
+        {
+            "Monday": "月",
+            "Tuesday": "火",
+            "Wednesday": "水",
+            "Thursday": "木",
+            "Friday": "金",
+            "Saturday": "土",
+            "Sunday": "日",
+        }
+    )
+    insert_at = result_df.columns.get_loc("日付") + 1
+    result_df.insert(insert_at, "曜日", result_df.pop("曜日"))
+    result_df["日付"] = result_df["日付"].dt.strftime("%Y-%m-%d")
 
 st.subheader("検索結果")
 if result_df.empty:
     st.info("該当データがありません")
 else:
-    st.dataframe(result_df, use_container_width=True)
-    csv = result_df.to_csv(index=False).encode("utf-8-sig")
+    display_columns = [col for col in result_df.columns if col != "編集日付"]
+    display_result_df = result_df[display_columns].copy()
+    st.dataframe(display_result_df, use_container_width=True)
+    csv = display_result_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         label="CSVダウンロード",
         data=csv,
@@ -312,3 +440,105 @@ else:
 
             conn.commit()
             st.success("登録内容を更新しました。再検索して最新状態を確認してください。")
+
+    st.markdown("---")
+    st.subheader("変更届データ出力")
+    st.caption("条件で検索し、対象行へチェックを入れると、下部プレビューおよびテンプレート反映Excel出力ができます。")
+
+    with st.expander("絞り込み条件", expanded=True):
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+        with filter_col1:
+            filter_dept = st.text_input("診療科で検索", value="")
+        with filter_col2:
+            filter_doctor = st.text_input("医師名で検索", value="")
+        with filter_col3:
+            filter_keyword = st.text_input("変更内容/備考で検索", value="")
+
+    filtered_df = display_result_df.copy()
+    if filter_dept:
+        filtered_df = filtered_df[filtered_df["診療科"].fillna("").str.contains(filter_dept, case=False, na=False)]
+    if filter_doctor:
+        filtered_df = filtered_df[filtered_df["医師"].fillna("").str.contains(filter_doctor, case=False, na=False)]
+    if filter_keyword:
+        keyword_mask = (
+            filtered_df["変更内容"].fillna("").str.contains(filter_keyword, case=False, na=False)
+            | filtered_df["備考"].fillna("").str.contains(filter_keyword, case=False, na=False)
+        )
+        filtered_df = filtered_df[keyword_mask]
+
+    if filtered_df.empty:
+        st.info("絞り込み条件に一致するデータがありません。")
+    else:
+        select_df = filtered_df.copy()
+        select_df.insert(0, "出力対象", False)
+        edited_selection = st.data_editor(
+            select_df,
+            hide_index=True,
+            use_container_width=True,
+            disabled=[col for col in select_df.columns if col != "出力対象"],
+            column_config={"出力対象": st.column_config.CheckboxColumn("出力対象")},
+            key="history_export_selection_editor",
+        )
+
+        selected_export_df = edited_selection[edited_selection["出力対象"]].drop(columns=["出力対象"])
+
+        st.markdown("#### 出力対象プレビュー")
+        if selected_export_df.empty:
+            st.info("出力したい行にチェックを入れてください。")
+        else:
+            input_col1, input_col2 = st.columns(2)
+            with input_col1:
+                export_user = st.text_input("変更届出力者", value="")
+            with input_col2:
+                export_date = st.date_input("変更届出力日")
+
+            selected_export_df = selected_export_df.copy()
+            selected_export_df["変更届出力者"] = export_user if export_user else None
+            selected_export_df["変更届出力日"] = str(export_date)
+            st.dataframe(selected_export_df, use_container_width=True)
+
+            st.markdown("#### テンプレート反映設定")
+            st.info(
+                "Excelテンプレート（.xlsx）にプレースホルダ（例: {{診療科#1}}）を入力しておくと、"
+                "チェック済みの出力対象データを反映したExcelをダウンロードできます。"
+            )
+            st.caption(
+                "プレースホルダ書式: {{列名#行番号}} / {{列名}} / {{固定:文字列}} "
+                "（例: {{日付#1}}, {{曜日#1}}, {{診療科#2}}, {{変更届出力者#1}}）"
+            )
+
+            template_file = st.file_uploader(
+                "変更届Excelテンプレート（.xlsx）",
+                type=["xlsx"],
+                key="history_template_uploader",
+            )
+
+            if template_file is not None:
+                try:
+                    template_bytes = template_file.getvalue()
+                    workbook = load_workbook(BytesIO(template_bytes))
+                    worksheet = workbook.active
+                    apply_history_placeholder_mappings(
+                        worksheet=worksheet,
+                        df=selected_export_df,
+                    )
+                    output = BytesIO()
+                    workbook.save(output)
+                    filled_excel = output.getvalue()
+                    download_clicked = st.download_button(
+                        label="テンプレート反映版Excelダウンロード",
+                        data=filled_excel,
+                        file_name="変更届_テンプレート反映.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                    if download_clicked:
+                        save_output_history(
+                            conn=conn,
+                            target_df=selected_export_df,
+                            output_by=export_user,
+                            output_date=str(export_date),
+                        )
+                        st.success("変更届出力履歴を登録しました。")
+                        st.rerun()
+                except Exception as exc:
+                    st.error(f"テンプレートExcelへの反映に失敗しました: {exc}")
