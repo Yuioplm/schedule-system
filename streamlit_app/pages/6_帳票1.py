@@ -6,84 +6,13 @@ from io import BytesIO
 import re
 
 from openpyxl import load_workbook
-from openpyxl.utils.cell import coordinate_to_tuple, range_boundaries, get_column_letter
+from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from streamlit_app.sql_loader import load_sql
-
-
-REPORT1_TEMPLATE_HEADER_CELL_MAP = {
-    "year": "F1",
-    "month": "G1",
-}
-
-REPORT1_TEMPLATE_ROW_START = 3
-REPORT1_TEMPLATE_COLUMN_MAP = {
-    "センター": "B",
-    "診療科": "C",
-    "時間": "D",
-    "月": "E",
-    "火": "F",
-    "水": "G",
-    "木": "H",
-    "金": "I",
-    "土": "J",
-}
-
-
-def build_report1_template_excel(
-    df: pd.DataFrame,
-    year: int,
-    month: int,
-    template_bytes: bytes,
-) -> bytes:
-    workbook = load_workbook(BytesIO(template_bytes))
-    worksheet = workbook.active
-
-    merged_anchor_map = {}
-    for merged_range in worksheet.merged_cells.ranges:
-        min_col, min_row, max_col, max_row = merged_range.bounds
-        anchor = (min_row, min_col)
-        for row_num in range(min_row, max_row + 1):
-            for col_num in range(min_col, max_col + 1):
-                merged_anchor_map[(row_num, col_num)] = anchor
-
-    def write_value(cell_ref: str, value) -> None:
-        row_num, col_num = coordinate_to_tuple(cell_ref)
-        anchor_row, anchor_col = merged_anchor_map.get((row_num, col_num), (row_num, col_num))
-        worksheet.cell(row=anchor_row, column=anchor_col, value=value)
-
-    write_value(REPORT1_TEMPLATE_HEADER_CELL_MAP["year"], year)
-    write_value(REPORT1_TEMPLATE_HEADER_CELL_MAP["month"], month)
-
-    for row_idx, (_, row) in enumerate(df.iterrows(), start=REPORT1_TEMPLATE_ROW_START):
-        for src_col, col_letter in REPORT1_TEMPLATE_COLUMN_MAP.items():
-            if src_col not in df.columns:
-                continue
-            value = row[src_col]
-            write_value(f"{col_letter}{row_idx}", "" if pd.isna(value) else str(value))
-
-    output = BytesIO()
-    workbook.save(output)
-    return output.getvalue()
-
-
-def render_template_preview(template_bytes: bytes, cell_range: str) -> pd.DataFrame:
-    workbook = load_workbook(BytesIO(template_bytes), data_only=True)
-    worksheet = workbook.active
-    min_col, min_row, max_col, max_row = range_boundaries(cell_range)
-
-    data = []
-    for row_num in range(min_row, max_row + 1):
-        row_data = {"行": row_num}
-        for col_num in range(min_col, max_col + 1):
-            col_name = get_column_letter(col_num)
-            row_data[col_name] = worksheet.cell(row=row_num, column=col_num).value
-        data.append(row_data)
-    return pd.DataFrame(data)
 
 
 def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: int) -> None:
@@ -97,8 +26,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
             return source_df
 
         normalized_series = source_df[col_name].map(normalize_text)
-        exact_df = source_df[normalized_series == normalized_target]
-        return exact_df
+        return source_df[normalized_series == normalized_target]
 
     merged_anchor_map = {}
     for merged_range in worksheet.merged_cells.ranges:
@@ -116,6 +44,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
     # 使用可能な書式:
     # {{年}} / {{月}} / {{固定:文字列}}
     # {{曜日|診療科|時間|診察室}} 例: {{月|内科|午前|101}}
+    # ※ 診療科・診察室はワイルドカード（*）可
     # 旧形式: {{列名#行番号}} も後方互換で許可
     token_pattern = re.compile(r"^\s*\{\{\s*(.+?)\s*\}\}\s*$")
     for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=worksheet.max_column):
@@ -138,9 +67,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
                 normalized_token = token.replace("｜", "|")
                 parts = [part.strip() for part in normalized_token.split("|")]
                 if len(parts) >= 3:
-                    weekday = parts[0]
-                    dept = parts[1]
-                    time_slot = parts[2]
+                    weekday, dept, time_slot = parts[:3]
                     room = parts[3] if len(parts) >= 4 else ""
 
                     if weekday in df.columns:
@@ -175,6 +102,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
 
             write_value(cell.coordinate, replacement)
 
+
 st.set_page_config(layout="wide")
 st.title("帳票① 外来担当医表")
 
@@ -186,9 +114,17 @@ with col1:
 with col2:
     month = st.number_input("月", min_value=1, max_value=12, value=4, step=1)
 
-target_month = f"{int(year)}-{int(month):02d}"
+subcategory = st.radio(
+    "小カテゴリ",
+    ["院内用", "外部用"],
+    horizontal=True,
+    help="院内用は既存仕様、外部用は医師名をフルネーム・週表記を「第1・3...」で出力します。",
+)
 
-query = load_sql("Report1_pivot.sql")
+sql_name = "Report1_pivot.sql" if subcategory == "院内用" else "Report1_pivot_external.sql"
+
+target_month = f"{int(year)}-{int(month):02d}"
+query = load_sql(sql_name)
 df = pd.read_sql(query, conn, params={"target_month": target_month})
 
 if df.empty:
@@ -223,7 +159,7 @@ else:
     st.download_button(
         label="Excelダウンロード",
         data=csv,
-        file_name=f"帳票①_外来担当医表_{target_month}.csv",
+        file_name=f"帳票①_外来担当医表_{subcategory}_{target_month}.csv",
         mime="text/csv",
     )
 
@@ -234,16 +170,16 @@ else:
     )
     st.caption(
         "プレースホルダ書式: {{年}} / {{月}} / {{固定:文字列}} / {{曜日|診療科|時間|診察室}} "
-        "（例: {{月|内科|午前|10}}, {{火|外科|午後|*}}, {{固定:休診}}）※ `|` と `｜` の両方可"
+        "（例: {{月|内科|午前|10}}, {{火|*|午後|*}}, {{固定:休診}}）※ `|` と `｜` の両方可"
     )
     with st.expander("操作ガイド", expanded=True):
         st.markdown(
             """
             1. Excelテンプレートの値を入れたいセルに、プレースホルダを直接入力します。  
-            2. 例: `{{年}}`, `{{月}}`, `{{月|内科|午前|101}}`, `{{火|外科|午後|*}}`, `{{固定:休診}}`。  
+            2. 例: `{{年}}`, `{{月}}`, `{{月|内科|午前|101}}`, `{{火|*|午後|*}}`, `{{固定:休診}}`。  
             3. 画面でテンプレートをアップロードし、**テンプレート反映版Excelダウンロード** を押します。  
             4. 出力結果を確認し、必要ならテンプレート側のプレースホルダを修正します。  
-            5. `*` はワイルドカードです（例: 部屋番号を問わない場合は `{{月|内科|午前|*}}`）。  
+            5. `*` はワイルドカードです（例: 診療科を問わない `{{月|*|午前|101}}`、部屋番号を問わない `{{月|内科|午前|*}}`）。  
             """
         )
 
@@ -258,13 +194,6 @@ else:
 
     if template_file is not None:
         template_bytes = template_file.getvalue()
-        preview_range = st.text_input("テンプレートプレビュー範囲", value="A1:J20")
-        try:
-            preview_df = render_template_preview(template_bytes, preview_range)
-            st.dataframe(preview_df, use_container_width=True, hide_index=True)
-        except Exception as exc:
-            st.warning(f"テンプレートプレビューに失敗しました: {exc}")
-
         try:
             workbook = load_workbook(BytesIO(template_bytes))
             worksheet = workbook.active
@@ -280,7 +209,7 @@ else:
             st.download_button(
                 label="テンプレート反映版Excelダウンロード",
                 data=filled_excel,
-                file_name=f"帳票①_外来担当医表_{target_month}_template.xlsx",
+                file_name=f"帳票①_外来担当医表_{subcategory}_{target_month}_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         except Exception as exc:
