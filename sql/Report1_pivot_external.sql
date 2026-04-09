@@ -125,8 +125,10 @@ cell_tokens_distinct AS (
         DayOfWeek,
         DeptSort,
         CASE
-            WHEN WeekLabel = '' THEN DoctorName || SpecialtyLabel
-            ELSE WeekLabel || DoctorName || SpecialtyLabel
+            WHEN WeekLabel = '' THEN
+                DoctorName || CASE WHEN SpecialtyLabel = '' THEN '' ELSE CHAR(10) || SpecialtyLabel END
+            ELSE
+                WeekLabel || DoctorName || CASE WHEN SpecialtyLabel = '' THEN '' ELSE CHAR(10) || SpecialtyLabel END
         END AS TokenText,
         TokenSortKey,
         EmploymentSortKey,
