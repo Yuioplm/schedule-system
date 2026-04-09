@@ -46,15 +46,19 @@ T_ConsultationSlot + M_Date
 - `pages/3_予定変更入力.py`
   - タブ1: 通常枠変更登録（`T_ScheduleChange`）
   - タブ2: 臨時外来登録（`T_TemporarySchedule`）
-- `pages/4_帳票1.py`
-  - 帳票①表示
-  - 画面表示モード切替
-  - CSV / HTML ダウンロード（セル内に専門名 `＜...＞` 表示対応）
-- `pages/5_帳票2.py`〜`pages/8_帳票5.py`
-  - 帳票②〜⑤
+- `pages/4_反映後予定検索.py`
+  - 変更反映後の予定検索
+- `pages/5_変更登録履歴.py`
+  - 変更登録履歴の検索
+- `pages/6_帳票1.py`〜`pages/10_帳票5.py`
+  - 帳票①〜⑤
   - 帳票③〜⑤は合計行を末尾表示
   - 帳票⑤は「選択した年月が属する年度の4月〜選択年月末」で集計
-- `pages/9_マスタ管理.py`
+- `pages/11_帳票6.py`
+  - 帳票⑥（非常勤医師勤務報告書）
+  - 日（1〜月末）/AM勤務/PM勤務/備考のプレビュー
+  - Excelテンプレートを用いた医師別シート一括出力
+- `pages/12_マスタ管理.py`
   - 主要マスタの検索・編集・新規登録
 
 ---
@@ -70,6 +74,9 @@ T_ConsultationSlot + M_Date
   - 帳票①表示用データ（月〜土）
 - `sql/Report2.sql`〜`sql/Report5.sql`
   - 帳票②〜⑤（`start_date` / `end_date` パラメータ対応）
+- `sql/Report6_daily_status.sql` / `sql/Report6_doctors.sql`
+  - 帳票⑥（非常勤医師勤務報告書）用データ取得
+  - `V_ScheduleActual` / `V_ScheduleBase` / `T_ScheduleChange` / `T_TemporarySchedule` を参照して日次勤務状態を算出
 
 > Streamlit 側は `streamlit_app/sql_loader.py` を通して SQL ファイルを読み込みます。
 
@@ -149,7 +156,9 @@ Schedule-System/
 │  ├─ Report2.sql
 │  ├─ Report3.sql
 │  ├─ Report4.sql
-│  └─ Report5.sql
+│  ├─ Report5.sql
+│  ├─ Report6_daily_status.sql
+│  └─ Report6_doctors.sql
 ├─ scripts/
 │  ├─ settings.py
 │  ├─ init_db.py
@@ -164,12 +173,15 @@ Schedule-System/
       ├─ 1_枠管理.py
       ├─ 2_予定検索.py
       ├─ 3_予定変更入力.py
-      ├─ 4_帳票1.py
-      ├─ 5_帳票2.py
-      ├─ 6_帳票3.py
-      ├─ 7_帳票4.py
-      ├─ 8_帳票5.py
-      └─ 9_マスタ管理.py
+      ├─ 4_反映後予定検索.py
+      ├─ 5_変更登録履歴.py
+      ├─ 6_帳票1.py
+      ├─ 7_帳票2.py
+      ├─ 8_帳票3.py
+      ├─ 9_帳票4.py
+      ├─ 10_帳票5.py
+      ├─ 11_帳票6.py
+      └─ 12_マスタ管理.py
 ```
 
 ---
