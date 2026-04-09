@@ -16,7 +16,8 @@ pages = [
     st.Page("pages/8_帳票3.py", title="帳票➂ 外来数"),
     st.Page("pages/9_帳票4.py", title="帳票➃ 常勤日別コマ数"),
     st.Page("pages/10_帳票5.py", title="帳票➄ 常勤・非常勤月別コマ数"),
-    st.Page("pages/11_マスタ管理.py", title="マスタ管理"),
+    st.Page("pages/11_帳票6.py", title="帳票⑥ 非常勤医師勤務報告書"),
+    st.Page("pages/12_マスタ管理.py", title="マスタ管理"),
 ]
 
 navigation = st.navigation(pages)
