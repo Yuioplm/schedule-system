@@ -6,10 +6,17 @@ WITH part_time_doctor AS (
     SELECT
         DoctorID,
         DoctorName,
-        Department
+        Department AS 所属
     FROM M_Doctor
     WHERE EmploymentType = '非常勤'
       AND COALESCE(ActiveFlag, 1) = 1
+),
+eligible_dept AS (
+    SELECT
+        ClinDeptID
+    FROM M_ClinicalDepartment
+    WHERE COALESCE(ActiveFlag, 1) = 1
+      AND COALESCE(CAST(Rpt6Flag AS INTEGER), 0) = 1
 ),
 plan_doctor AS (
     SELECT DISTINCT
@@ -17,6 +24,8 @@ plan_doctor AS (
     FROM V_ScheduleBase sb
     JOIN part_time_doctor d
       ON sb.DoctorID = d.DoctorID
+    JOIN eligible_dept ed
+      ON sb.Rpt1ClinDeptID = ed.ClinDeptID
     WHERE sb.CalendarDate BETWEEN :start_date AND :end_date
 ),
 actual_doctor AS (
@@ -25,12 +34,14 @@ actual_doctor AS (
     FROM V_ScheduleActual sa
     JOIN part_time_doctor d
       ON sa.DoctorID = d.DoctorID
+    JOIN eligible_dept ed
+      ON sa.Rpt1ClinDeptID = ed.ClinDeptID
     WHERE sa.CalendarDate BETWEEN :start_date AND :end_date
 )
 SELECT
     d.DoctorID,
     d.DoctorName,
-    d.Department
+    d.所属
 FROM part_time_doctor d
 LEFT JOIN plan_doctor p
   ON d.DoctorID = p.DoctorID

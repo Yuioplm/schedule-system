@@ -31,9 +31,13 @@ actual_rows AS (
     FROM V_ScheduleActual sa
     JOIN part_time_doctor d
       ON sa.DoctorID = d.DoctorID
+    JOIN M_ClinicalDepartment cd
+      ON sa.Rpt1ClinDeptID = cd.ClinDeptID
     LEFT JOIN M_TimeSlot ts
       ON sa.TimeSlotID = ts.TimeSlotID
     WHERE sa.CalendarDate BETWEEN :start_date AND :end_date
+      AND COALESCE(cd.ActiveFlag, 1) = 1
+      AND COALESCE(CAST(cd.Rpt6Flag AS INTEGER), 0) = 1
 ),
 rest_rows AS (
     SELECT
