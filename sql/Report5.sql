@@ -30,7 +30,7 @@ LEFT JOIN M_ClinicalDepartment cd
     ON sa.Rpt1ClinDeptID = cd.ClinDeptID
 
 WHERE
-    d.EmploymentType IN ('常勤', '非常勤')
+    d.EmploymentType IN ('常勤', '非常勤', '理事')
     AND sa.CalendarDate BETWEEN :start_date AND :end_date
     AND (
         (sa.Rpt5ClinDeptID IS NOT NULL AND rcd.ActiveFlag = 1)

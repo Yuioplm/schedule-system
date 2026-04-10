@@ -65,8 +65,6 @@ LEFT JOIN M_Doctor d
 
 WHERE
     COALESCE(CAST(lc.Rpt2Flag AS INTEGER), 1) = 1
-    AND
-    d.EmploymentType IN ('常勤', '非常勤')
     AND lc.CalendarDate >= :start_date
     AND (
         (sb.Rpt2ClinDeptID IS NOT NULL AND rcd.ActiveFlag = 1)
@@ -122,7 +120,6 @@ LEFT JOIN M_Doctor d
 WHERE
     tsch.ActiveFlag = 1
     AND COALESCE(CAST(tsch.Rpt2Flag AS INTEGER), 1) = 1
-    AND d.EmploymentType IN ('常勤', '非常勤')
     AND tsch.CalendarDate >= :start_date
     AND (
         (tsch.Rpt2ClinDeptID IS NOT NULL AND rcd.ActiveFlag = 1)
