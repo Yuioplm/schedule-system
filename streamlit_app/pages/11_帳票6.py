@@ -42,7 +42,7 @@ def fetch_eligible_doctors(conn, start_date: str, end_date: str) -> pd.DataFrame
         cursor = conn.execute(query, params)
         rows = cursor.fetchall()
         if cursor.description is None:
-            return pd.DataFrame(columns=["DoctorID", "DoctorName", "Department"])
+            return pd.DataFrame(columns=["DoctorID", "DoctorName", "所属"])
         columns = [col_desc[0] for col_desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)
 
@@ -181,8 +181,8 @@ def write_doctor_sheet(
                 else:
                     replaced = (
                         raw.replace("{{医師名}}", doctor_name)
-                        .replace("{{DoctorID}}", str(doctor_id))
-                        .replace("{{Department}}", department)
+                        .replace("{{ID}}", str(doctor_id))
+                        .replace("{{所属}}", department)
                         .replace("{{年}}", str(year))
                         .replace("{{月}}", str(month))
                     )
@@ -226,13 +226,13 @@ if doctor_df.empty:
 
 report6_source_df = fetch_report6_rows(conn, start_date, end_date)
 
-doctor_df["Department"] = doctor_df["Department"].fillna("")
-department_options = ["(全て)"] + sorted([x for x in doctor_df["Department"].unique().tolist() if x])
-selected_department = st.selectbox("所属（Department）", department_options)
+doctor_df["所属"] = doctor_df["所属"].fillna("")
+department_options = ["(全て)"] + sorted([x for x in doctor_df["所属"].unique().tolist() if x])
+selected_department = st.selectbox("所属", department_options)
 
 filtered_doctor_df = doctor_df.copy()
 if selected_department != "(全て)":
-    filtered_doctor_df = filtered_doctor_df[filtered_doctor_df["Department"] == selected_department]
+    filtered_doctor_df = filtered_doctor_df[filtered_doctor_df["所属"] == selected_department]
 
 if filtered_doctor_df.empty:
     st.warning("選択した所属に該当する医師がいません")
@@ -244,7 +244,7 @@ selected_doctor_id = st.selectbox(
     doctor_options,
     format_func=lambda doc_id: (
         f"{filtered_doctor_df.loc[filtered_doctor_df['DoctorID'] == doc_id, 'DoctorName'].iloc[0]} "
-        f"(ID:{doc_id}, 所属:{filtered_doctor_df.loc[filtered_doctor_df['DoctorID'] == doc_id, 'Department'].iloc[0] or '-'})"
+        f"(ID:{doc_id}, 所属:{filtered_doctor_df.loc[filtered_doctor_df['DoctorID'] == doc_id, '所属'].iloc[0] or '-'})"
     ),
 )
 selected_doctor_row = filtered_doctor_df.loc[filtered_doctor_df["DoctorID"] == selected_doctor_id].iloc[0]
@@ -270,7 +270,7 @@ st.download_button(
 
 st.markdown("#### Excelテンプレート（個人別シート出力）")
 st.caption("テンプレートをアップロードすると、選択月に外来予定または実績がある非常勤医師ごとのシート（シート名：医師名）を作成してExcelを出力します。")
-st.caption("テンプレート内プレースホルダ: {{医師名}}, {{DoctorID}}, {{Department}}, {{年}}, {{月}}, {{明細開始}}（明細表を出力する場合に必須）")
+st.caption("テンプレート内プレースホルダ: {{医師名}}, {{ID}}, {{所属}}, {{年}}, {{月}}, {{明細開始}}（明細表を出力する場合に必須）")
 st.caption("日別カラム指定プレースホルダ: {{1|曜日}}, {{5|AM勤務}}, {{7|PM勤務}}, {{12|備考}}")
 
 template_file = st.file_uploader("帳票⑥Excelテンプレート（.xlsx）", type=["xlsx"])
@@ -313,7 +313,7 @@ if template_file is not None:
             for doctor, ws in sheet_plan:
                 doc_id = int(doctor["DoctorID"])
                 doc_name = str(doctor["DoctorName"]) if doctor["DoctorName"] else f"Doctor_{doc_id}"
-                doc_department = str(doctor["Department"]) if doctor["Department"] else ""
+                doc_department = str(doctor["所属"]) if doctor["所属"] else ""
                 doc_report_df = build_report_dataframe(
                     doctor_id=doc_id,
                     year=int(year),
