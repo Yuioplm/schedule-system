@@ -1,111 +1,145 @@
 # Schedule System（外来スケジュール管理）
 
-このリポジトリは、**外来スケジュールの枠管理・予定検索/変更・臨時外来登録・帳票出力・マスタ管理**を行う Streamlit + SQLite アプリです。
+このリポジトリは、**外来スケジュールの枠管理・予定変更・反映後予定検索・変更履歴管理・帳票出力・マスタ管理**を行う、
+**Streamlit + SQLite** ベースのアプリケーションです。
+
+現時点の実装に合わせ、READMEを更新しています。
 
 ---
 
-## 1. 機能概要（現時点）
+## 1. システム概要（現行実装ベース）
 
-- **枠管理**: `T_ConsultationSlot` の検索・編集・新規登録（既存枠コピー対応、`Rpt1SpecialtyID`・`Rpt2~Rpt6ClinDeptID` 編集対応）
-- **予定検索**: `V_ScheduleFull` を検索し、対象行を変更入力へ受け渡し
-- **予定変更入力**: 通常枠の変更登録（`T_ScheduleChange`）
-- **臨時外来登録**: タブ画面から `T_TemporarySchedule` を登録
-- **帳票①**: 月指定で外来担当医表を表示し、CSV / HTML を出力（必要時に `＜SpecialtyName＞` 付与）
-- **帳票②〜⑤**: 期間指定で集計・ピボット出力（CSVダウンロード、帳票③〜⑤は末尾に合計行あり）
-- **マスタ管理**: 主要マスタ（診療科・医師・時間帯・専門・帳票診療科・変更種別）を画面編集
+- **基盤データ**は `T_ConsultationSlot`（診療枠テンプレート）と `M_Date`（日付マスタ）を起点に生成
+- **予定変更**は `T_ScheduleChange`（通常枠の変更履歴）に登録
+- **臨時外来**は `T_TemporarySchedule` に登録
+- **反映後予定**はビュー `V_ScheduleActual` で統合（通常枠 + 最新変更 + 臨時外来）
+- 各帳票ページは `sql/*.sql` を `streamlit_app/sql_loader.py` で読み込み実行
 
 ---
 
-## 2. データフロー
+## 2. 主要データモデル
 
-```text
-T_ConsultationSlot + M_Date (+ M_Holiday)
-                  └─> V_ScheduleBase
-                         + T_ScheduleChange(最新)
-                         + T_TemporarySchedule
-                  └─> V_ScheduleActual
-                             └─> 帳票2/3/4/5
+### 2.1 マスタ
 
-T_ConsultationSlot + M_Date
-                  └─> Report1_intermediate.sql
-                  └─> Report1_pivot.sql
-                             └─> 帳票①（画面/CSV/HTML）
-```
+- `M_ClinicalDepartment`（診療科、帳票フラグ `Rpt1Flag`〜`Rpt6Flag` 等）
+- `M_Specialty`（専門）
+- `M_ReportClinicalDepartment`（帳票用診療科）
+- `M_Doctor`（医師、所属、勤務形態）
+- `M_TimeSlot`（時間帯）
+- `M_Date`（日付、曜日、週番号、年月）
+- `M_Holiday`（祝日・年末年始）
+- `M_ScheduleChangeType`（変更種別）
 
----
+### 2.2 トランザクション
 
-## 3. 画面一覧
+- `T_ConsultationSlot`（通常枠テンプレート）
+  - `Rpt1ClinDeptID` / `Rpt1SpecialtyID` / `Rpt1DisplayDoctorName`
+  - `Rpt2ClinDeptID`〜`Rpt6ClinDeptID`
+  - `WeekPattern`（第1〜第5週の適用）
+  - `StartDate`〜`EndDate`（有効期間）
+- `T_ScheduleChange`（通常枠の変更登録）
+  - 変更後医師・時間帯・部屋、変更内容、備考、`Rpt2Flag` など
+  - 同一日付・同一枠では **最新 `ChangeID`** を有効変更として扱う
+- `T_TemporarySchedule`（臨時外来登録）
+  - Rpt系カラムを保持し、`V_ScheduleActual` に統合
 
-- `pages/1_枠管理.py`
-  - フィルタ（診療科/医師/曜日）
-  - 既存枠編集（終了日未定=9999-12-31対応）
-  - 新規枠登録（マスタ選択 + 既存枠コピー）
-  - 帳票関連キー編集（`Rpt1SpecialtyID`, `Rpt2~Rpt6ClinDeptID`）
-- `pages/2_予定検索.py`
-  - 予定検索と変更対象選択
-- `pages/3_予定変更入力.py`
-  - タブ1: 通常枠変更登録（`T_ScheduleChange`）
-  - タブ2: 臨時外来登録（`T_TemporarySchedule`）
-- `pages/4_反映後予定検索.py`
-  - 変更反映後の予定検索
-- `pages/5_変更登録履歴.py`
-  - 変更登録履歴の検索
-- `pages/6_帳票1.py`〜`pages/10_帳票5.py`
-  - 帳票①〜⑤
-  - 帳票③〜⑤は合計行を末尾表示
-  - 帳票⑤は「選択した年月が属する年度の4月〜選択年月末」で集計
-- `pages/11_帳票6.py`
-  - 帳票⑥（非常勤医師勤務報告書）
-  - 日（1〜月末）/AM勤務/PM勤務/備考のプレビュー
-  - Excelテンプレートを用いた医師別シート一括出力
-- `pages/12_マスタ管理.py`
-  - 主要マスタの検索・編集・新規登録
+### 2.3 ビュー
+
+- `V_ScheduleBase`
+  - `M_Date` × `T_ConsultationSlot`
+  - 有効期間・`WeekPattern`・有効フラグで絞り込み
+  - `M_Holiday` を用いて祝日除外
+- `V_ScheduleFull`
+  - `V_ScheduleBase` に診療科/専門/医師/時間帯名を付加（予定検索向け）
+- `V_ScheduleActual`
+  - 通常枠 + 最新変更（取消除外） + 臨時外来 を統合（反映後予定・帳票向け）
 
 ---
 
-## 4. SQL構成
+## 3. 画面構成（`streamlit_app/pages`）
 
-- `sql/create_tables.sql`
-  - テーブル/ビュー定義
-  - `M_ClinicalDepartment.Rpt1Sort` を含む
-- `sql/Report1_intermediate.sql`
-  - 帳票①中間データ生成（ピボット前）
-- `sql/Report1_pivot.sql`
-  - 帳票①表示用データ（月〜土）
-- `sql/Report2.sql`〜`sql/Report5.sql`
-  - 帳票②〜⑤（`start_date` / `end_date` パラメータ対応）
-- `sql/Report6_daily_status.sql` / `sql/Report6_doctors.sql`
-  - 帳票⑥（非常勤医師勤務報告書）用データ取得
-  - `V_ScheduleActual` / `V_ScheduleBase` / `T_ScheduleChange` / `T_TemporarySchedule` を参照して日次勤務状態を算出
-
-> Streamlit 側は `streamlit_app/sql_loader.py` を通して SQL ファイルを読み込みます。
+1. **枠管理**（`1_枠管理.py`）
+   - 枠検索・編集・新規登録
+   - `9999-12-31`（終了日未定）をUI上で安全日付へ補正して扱う
+2. **予定検索**（`2_予定検索.py`）
+   - `V_ScheduleFull` 検索
+   - 選択行をセッション経由で変更入力画面へ連携
+3. **予定変更入力**（`3_予定変更入力.py`）
+   - タブ1: 通常枠変更（`T_ScheduleChange`）
+   - タブ2: 臨時外来登録（`T_TemporarySchedule`）
+4. **反映後予定検索**（`4_反映後予定検索.py`）
+   - `V_ScheduleActual` 検索
+5. **変更登録履歴検索**（`5_変更登録履歴.py`）
+   - 変更履歴検索
+   - Excelテンプレートへのプレースホルダ反映出力（画像保持考慮）
+6. **帳票① 外来担当医表**（`6_帳票1.py`）
+   - 院内用/外部用切替（`Report1_pivot.sql` / `Report1_pivot_external.sql`）
+   - 画面表示、CSV出力、Excelテンプレート反映出力
+7. **帳票② 予定変更一覧**（`7_帳票2.py`）
+8. **帳票③ 外来数**（`8_帳票3.py`）
+   - 日別ピボット + 合計行
+9. **帳票④ 常勤日別コマ数**（`9_帳票4.py`）
+   - 日別ピボット + 合計行
+10. **帳票⑤ 常勤・非常勤月別コマ数**（`10_帳票5.py`）
+    - 年度開始（4月）〜選択月末で集計 + 合計行
+11. **帳票⑥ 非常勤医師勤務報告書**（`11_帳票6.py`）
+    - 対象月の非常勤医師抽出（予定/実績ベース）
+    - 日別 AM/PM 勤務・備考プレビュー
+    - 医師別シートをExcelテンプレートから一括生成
+12. **マスタ管理**（`12_マスタ管理.py`）
+    - 診療科・医師・時間帯・専門・帳票診療科・変更種別を画面編集
 
 ---
 
-## 5. セットアップ
+## 4. SQLファイル構成（`sql/`）
+
+- `create_tables.sql`
+  - 全テーブル・ビュー定義（`V_ScheduleBase` / `V_ScheduleFull` / `V_ScheduleActual` 含む）
+- 帳票系SQL
+  - `Report1_intermediate.sql`
+  - `Report1_pivot.sql`
+  - `Report1_pivot_external.sql`
+  - `Report2.sql`
+  - `Report3.sql`
+  - `Report4.sql`
+  - `Report5.sql`
+  - `Report6_daily_status.sql`
+  - `Report6_doctors.sql`
+  - `Report6_eligible_doctors.sql`
+
+---
+
+## 5. 初期セットアップ
 
 > 前提: Python 3.11 以上推奨
 
-### 5.1 依存関係インストール
+### 5.1 依存インストール
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5.2 初期セットアップ
+### 5.2 DB・初期データ作成
 
 ```bash
 python set_up.py
 ```
 
-このコマンドで以下を順次実行します。
+`set_up.py` では以下を順に実行します。
 
-- `scripts/init_db.py`
-- `scripts/import_master_csv.py`
-- `scripts/generate_date_master.py`
-- `scripts/generate_holiday_master.py`
-- `scripts/import_consultation_slot.py`
-- `scripts/fix_date_format.py`
+1. `scripts/init_db.py`
+2. `scripts/import_master_csv.py`
+3. `scripts/generate_date_master.py`
+4. `scripts/generate_holiday_master.py`
+5. `scripts/import_consultation_slot.py`
+6. `scripts/fix_date_format.py`
+
+補助スクリプト:
+
+- `scripts/fix_weekpattern_db.py`
+  - `T_ConsultationSlot.WeekPattern` のゼロ埋め補正
+- `scripts/reports.py`
+  - 帳票ロジック検証用のPython実装（現行UIの主経路はSQL + Streamlitページ）
 
 ### 5.3 起動
 
@@ -113,59 +147,47 @@ python set_up.py
 streamlit run streamlit_app/app.py
 ```
 
-初回起動で `Welcome to Streamlit!` のメール入力プロンプトが止まる問題を避けるため、
-このリポジトリでは `.streamlit/config.toml` で `gatherUsageStats = false` を設定し、
-`.streamlit/credentials.toml` で `email = ""` を明示しています。
-起動後はターミナルに表示される `Local URL`（通常 `http://localhost:8501`）へアクセスしてください。
+---
 
-それでも同メッセージが表示される場合は、以下のようにオプションを明示して起動してください。
+## 6. 運用ルール（現行実装で重要な点）
 
-```bash
-streamlit run streamlit_app/app.py --browser.gatherUsageStats false --server.headless true
-```
+- **終了日未定**はDBで `9999-12-31` を使用
+- **帳票キー**は `T_ConsultationSlot` / `T_TemporarySchedule` の `Rpt1〜Rpt6` 系カラムで管理
+- **予定変更の反映**は「同一日・同一枠の最新変更」を採用
+- **帳票②表示制御**には `Rpt2Flag` を使用
+- **祝日除外**は `V_ScheduleBase` 生成時点で適用
 
 ---
 
-## 6. よく使う運用ポイント
-
-- **終了日未定**は DB では `9999-12-31` を使用
-  - UI上は Streamlit制約により安全な日付に丸めて表示
-  - チェックボックスで「終了日未定」を制御
-- **帳票条件の主軸**
-  - 帳票①: `Rpt1ClinDeptID`, `Rpt1Flag`, `Rpt1Sort`
-  - 帳票②〜⑤: 各 `RptXClinDeptID`, `RptXFlag`
-- **帳票⑤の期間仕様**
-  - 年月選択に対して、開始は該当年度の4/1、終了は選択年月の月末
-- **SQL変更時の原則**
-  - SQLは `sql/` に集約
-  - ページ側は `load_sql()` + `params` で実行
-
----
-
-## 7. ディレクトリ（抜粋）
+## 7. ディレクトリ構成
 
 ```text
 Schedule-System/
 ├─ README.md
-├─ set_up.py
 ├─ requirements.txt
+├─ set_up.py
+├─ scripts/
+│  ├─ settings.py
+│  ├─ init_db.py
+│  ├─ import_master_csv.py
+│  ├─ import_consultation_slot.py
+│  ├─ generate_date_master.py
+│  ├─ generate_holiday_master.py
+│  ├─ fix_date_format.py
+│  ├─ fix_weekpattern_db.py
+│  └─ reports.py
 ├─ sql/
 │  ├─ create_tables.sql
 │  ├─ Report1_intermediate.sql
 │  ├─ Report1_pivot.sql
+│  ├─ Report1_pivot_external.sql
 │  ├─ Report2.sql
 │  ├─ Report3.sql
 │  ├─ Report4.sql
 │  ├─ Report5.sql
 │  ├─ Report6_daily_status.sql
-│  └─ Report6_doctors.sql
-├─ scripts/
-│  ├─ settings.py
-│  ├─ init_db.py
-│  ├─ import_master_csv.py
-│  ├─ generate_date_master.py
-│  ├─ generate_holiday_master.py
-│  └─ import_consultation_slot.py
+│  ├─ Report6_doctors.sql
+│  └─ Report6_eligible_doctors.sql
 └─ streamlit_app/
    ├─ app.py
    ├─ sql_loader.py
@@ -186,7 +208,9 @@ Schedule-System/
 
 ---
 
-## 8. 補足
+## 8. パス設定
 
 - DBファイル: `database/schedule.db`
-- 取込CSV: `csv/` 配下（`M_*.csv`, `T_ConsultationSlot.csv`）
+- マスタCSV: `csv/M_*.csv`
+- 初期枠CSV: `csv/T_ConsultationSlot.csv`
+
