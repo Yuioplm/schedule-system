@@ -2,10 +2,12 @@ import calendar
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+import re
 import sys
 
 import pandas as pd
 import streamlit as st
+from openpyxl.cell.cell import MergedCell
 from openpyxl import load_workbook
 
 from scripts.settings import get_conn
@@ -30,9 +32,19 @@ def classify_period(timeslot_name: str) -> str | None:
     return None
 
 
-def fetch_part_time_doctors(conn) -> pd.DataFrame:
-    query = load_sql("Report6_doctors.sql")
-    return pd.read_sql(query, conn)
+def fetch_eligible_doctors(conn, start_date: str, end_date: str) -> pd.DataFrame:
+    query = load_sql("Report6_eligible_doctors.sql")
+    params = {"start_date": start_date, "end_date": end_date}
+    try:
+        return pd.read_sql(query, conn, params=params)
+    except TypeError:
+        # 環境差異により cursor.description が None となる場合のフォールバック
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        if cursor.description is None:
+            return pd.DataFrame(columns=["DoctorID", "DoctorName"])
+        columns = [col_desc[0] for col_desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
 
 
 def fetch_report6_rows(conn, start_date: str, end_date: str) -> pd.DataFrame:
@@ -52,10 +64,12 @@ def build_report_dataframe(
 ) -> pd.DataFrame:
     days_in_month = calendar.monthrange(year, month)[1]
     date_index = pd.date_range(f"{year}-{month:02d}-01", periods=days_in_month, freq="D")
+    weekday_map = ["月", "火", "水", "木", "金", "土", "日"]
 
     day_df = pd.DataFrame({
         "CalendarDate": date_index.strftime("%Y-%m-%d"),
         "日": list(range(1, days_in_month + 1)),
+        "曜日": [weekday_map[d.weekday()] for d in date_index],
         "AM勤務": [None] * days_in_month,
         "PM勤務": [None] * days_in_month,
         "備考": [None] * days_in_month,
@@ -112,35 +126,66 @@ def build_report_dataframe(
         remarks = temp_map.get(cal_date, [])
         day_df.at[idx, "備考"] = " / ".join(remarks) if remarks else None
 
-    return day_df[["日", "AM勤務", "PM勤務", "備考"]]
+    return day_df[["日", "曜日", "AM勤務", "PM勤務", "備考"]]
 
 
 def write_doctor_sheet(worksheet, report_df: pd.DataFrame, doctor_name: str, year: int, month: int) -> None:
+    def set_cell_value_safe(row_no: int, col_no: int, value) -> None:
+        cell = worksheet.cell(row=row_no, column=col_no)
+        if isinstance(cell, MergedCell):
+            # 結合セルの先頭セル以外は書き込み不可のためスキップ
+            return
+        cell.value = value
+
+    day_column_names = {"曜日", "AM勤務", "PM勤務", "備考"}
+    day_value_map = {
+        (int(row["日"]), col_name): row[col_name]
+        for _, row in report_df.iterrows()
+        for col_name in day_column_names
+    }
+
+    day_pattern = re.compile(r"\{\{(\d{1,2})\|([^}]+)\}\}")
+
+    def replace_day_placeholder(text: str) -> str:
+        def _repl(match: re.Match[str]) -> str:
+            day = int(match.group(1))
+            col_name = match.group(2).strip()
+            if not (1 <= day <= calendar.monthrange(year, month)[1]):
+                return ""
+            if col_name not in day_column_names:
+                return ""
+            value = day_value_map.get((day, col_name))
+            return "" if pd.isna(value) else str(value)
+
+        return day_pattern.sub(_repl, text)
+
     marker_row = None
     marker_col = None
     for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=worksheet.max_column):
         for cell in row:
+            if isinstance(cell, MergedCell):
+                continue
             if isinstance(cell.value, str):
                 raw = cell.value.strip()
                 if raw == "{{明細開始}}":
                     marker_row, marker_col = cell.row, cell.column
                     cell.value = None
-                elif "{{医師名}}" in raw or "{{年}}" in raw or "{{月}}" in raw:
-                    cell.value = raw.replace("{{医師名}}", doctor_name).replace("{{年}}", str(year)).replace("{{月}}", str(month))
+                else:
+                    replaced = raw.replace("{{医師名}}", doctor_name).replace("{{年}}", str(year)).replace("{{月}}", str(month))
+                    cell.value = replace_day_placeholder(replaced)
 
     if marker_row is None or marker_col is None:
-        marker_row, marker_col = 2, 1
-        worksheet.cell(row=1, column=1, value="日")
-        worksheet.cell(row=1, column=2, value="AM勤務")
-        worksheet.cell(row=1, column=3, value="PM勤務")
-        worksheet.cell(row=1, column=4, value="備考")
+        # {{明細開始}} が無い場合は、プレースホルダ置換のみ行い
+        # 明細表の自動書き込みはしない（テンプレート指定位置を優先）
+        return
 
     for i, data_row in enumerate(report_df.itertuples(index=False), start=0):
         row_no = marker_row + i
-        worksheet.cell(row=row_no, column=marker_col, value=data_row[0])
-        worksheet.cell(row=row_no, column=marker_col + 1, value=data_row[1])
-        worksheet.cell(row=row_no, column=marker_col + 2, value=data_row[2])
-        worksheet.cell(row=row_no, column=marker_col + 3, value=data_row[3])
+        set_cell_value_safe(row_no, marker_col, data_row[0])
+        set_cell_value_safe(row_no, marker_col + 1, data_row[1])
+        set_cell_value_safe(row_no, marker_col + 2, data_row[2])
+        set_cell_value_safe(row_no, marker_col + 3, data_row[3])
+        set_cell_value_safe(row_no, marker_col + 4, data_row[4])
 
 
 st.set_page_config(layout="wide")
@@ -160,9 +205,9 @@ with col2:
 start_date = f"{int(year)}-{int(month):02d}-01"
 end_date = f"{int(year)}-{int(month):02d}-{calendar.monthrange(int(year), int(month))[1]:02d}"
 
-doctor_df = fetch_part_time_doctors(conn)
+doctor_df = fetch_eligible_doctors(conn, start_date, end_date)
 if doctor_df.empty:
-    st.warning("非常勤医師のマスタがありません")
+    st.warning("選択月に外来予定と実績がある非常勤医師がいません")
     st.stop()
 
 report6_source_df = fetch_report6_rows(conn, start_date, end_date)
@@ -190,8 +235,9 @@ st.download_button(
 )
 
 st.markdown("#### Excelテンプレート（個人別シート出力）")
-st.caption("テンプレートをアップロードすると、非常勤医師ごとのシート（シート名：医師名）を作成してExcelを出力します。")
-st.caption("テンプレート内プレースホルダ: {{医師名}}, {{年}}, {{月}}, {{明細開始}}（任意）")
+st.caption("テンプレートをアップロードすると、選択月に外来予定と実績がある非常勤医師ごとのシート（シート名：医師名）を作成してExcelを出力します。")
+st.caption("テンプレート内プレースホルダ: {{医師名}}, {{年}}, {{月}}, {{明細開始}}（明細表を出力する場合に必須）")
+st.caption("日別カラム指定プレースホルダ: {{1|曜日}}, {{5|AM勤務}}, {{7|PM勤務}}, {{12|備考}}")
 
 template_file = st.file_uploader("帳票⑥Excelテンプレート（.xlsx）", type=["xlsx"])
 
@@ -205,16 +251,14 @@ if template_file is not None:
             st.warning("対象の非常勤医師がいないため、Excelを作成できません")
         else:
             existing_names = set()
+            sheet_plan: list[tuple[dict, object]] = []
+
+            # 先に全シートを「未加工テンプレート」から複製しておく
+            # （1件目の書き込み後に複製すると、以降のシートが1件目内容を引き継いでしまうため）
             first = True
             for doctor in doctor_rows:
-                doc_id = int(doctor["DoctorID"])
-                doc_name = str(doctor["DoctorName"]) if doctor["DoctorName"] else f"Doctor_{doc_id}"
-                doc_report_df = build_report_dataframe(
-                    doctor_id=doc_id,
-                    year=int(year),
-                    month=int(month),
-                    source_df=report6_source_df,
-                )
+                doctor_id_raw = int(doctor["DoctorID"])
+                doc_name = str(doctor["DoctorName"]) if doctor["DoctorName"] else f"Doctor_{doctor_id_raw}"
 
                 if first:
                     ws = base_ws
@@ -230,6 +274,17 @@ if template_file is not None:
                     suffix += 1
                 ws.title = sheet_name
                 existing_names.add(sheet_name)
+                sheet_plan.append((doctor, ws))
+
+            for doctor, ws in sheet_plan:
+                doc_id = int(doctor["DoctorID"])
+                doc_name = str(doctor["DoctorName"]) if doctor["DoctorName"] else f"Doctor_{doc_id}"
+                doc_report_df = build_report_dataframe(
+                    doctor_id=doc_id,
+                    year=int(year),
+                    month=int(month),
+                    source_df=report6_source_df,
+                )
 
                 write_doctor_sheet(ws, doc_report_df, doc_name, int(year), int(month))
 
