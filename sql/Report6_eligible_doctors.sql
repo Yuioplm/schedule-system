@@ -1,11 +1,12 @@
 -- ==========================
 -- 帳票⑥ 対象医師一覧
--- 選択月に「外来予定」と「実績」の両方がある非常勤医師のみ
+-- 選択月に「外来予定」または「実績」がある非常勤医師
 -- ==========================
 WITH part_time_doctor AS (
     SELECT
         DoctorID,
-        DoctorName
+        DoctorName,
+        Department
     FROM M_Doctor
     WHERE EmploymentType = '非常勤'
       AND COALESCE(ActiveFlag, 1) = 1
@@ -28,10 +29,13 @@ actual_doctor AS (
 )
 SELECT
     d.DoctorID,
-    d.DoctorName
+    d.DoctorName,
+    d.Department
 FROM part_time_doctor d
-JOIN plan_doctor p
+LEFT JOIN plan_doctor p
   ON d.DoctorID = p.DoctorID
-JOIN actual_doctor a
+LEFT JOIN actual_doctor a
   ON d.DoctorID = a.DoctorID
+WHERE p.DoctorID IS NOT NULL
+   OR a.DoctorID IS NOT NULL
 ORDER BY d.DoctorName, d.DoctorID;
