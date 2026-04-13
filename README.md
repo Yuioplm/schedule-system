@@ -214,3 +214,53 @@ Schedule-System/
 - マスタCSV: `csv/M_*.csv`
 - 初期枠CSV: `csv/T_ConsultationSlot.csv`
 
+---
+
+## 9. Windows向け運用バッチ（朝の起動 / 夜のバックアップ）
+
+`ops/windows/` 配下に、ワンクリック実行用の `.bat` を用意しています。
+
+- `start_app.bat`
+  - 仮想環境 (`.venv`) があれば自動有効化
+  - `streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port 8501` で起動
+- `backup_db.bat`
+  - `database/schedule.db` を `backups` フォルダへ日時付きでコピー
+  - 直近30日より古いバックアップを自動削除
+- `stop_app.bat`
+  - `8501` ポートで待受中のプロセスを停止（`taskkill`）
+
+### 9.1 使い方
+
+1. 朝: `ops/windows/start_app.bat` をダブルクリック
+2. 夜: `ops/windows/backup_db.bat` をダブルクリック
+
+`start_app.bat` は Streamlit をバックグラウンド起動（コンソール非表示）します。
+起動後は `http://localhost:8501` にアクセスしてください。
+
+### 9.2 終了方法（シャットダウン以外）
+
+`start_app.bat` はバックグラウンド起動のため、
+終了時は `ops/windows/stop_app.bat` を実行してください（ポート 8501 の待受プロセスを停止）。
+
+### 9.3 起動しない場合の確認
+
+`start_app.bat` は起動時に以下を自動チェックします。
+
+- `streamlit_app/app.py` の存在
+- Python 実行環境（`venv` 優先、次に `.venv`。どちらも無ければ `venv` を自動作成）
+- `streamlit` パッケージの存在（未インストール時は `requirements.txt` から自動導入）
+
+`venv` の自動作成や依存自動導入に失敗した場合は、
+表示内容に従って対応してください（例: ネットワーク/プロキシ設定確認）。
+
+※ `activate` 実行は必須ではありません。`venv\Scripts\python.exe` を直接呼び出して起動します。
+
+### 9.4 接続先URL
+
+運用PCで `hostname` を実行し、表示されたPC名を使います。
+
+例:
+
+```text
+http://<PC名>:8501
+```
