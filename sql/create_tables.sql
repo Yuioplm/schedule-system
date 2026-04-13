@@ -421,7 +421,6 @@ SELECT
 FROM T_TemporarySchedule ts
 
 WHERE ts.ActiveFlag = 1
-  AND COALESCE(CAST(ts.Rpt2Flag AS INTEGER), 1) = 1
 
 ORDER BY
     CalendarDate,
