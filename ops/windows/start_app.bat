@@ -4,9 +4,16 @@ setlocal
 REM Move to repository root (this bat is in ops\windows)
 cd /d "%~dp0..\.."
 
+set "PORT=8501"
+set "URL=http://localhost:%PORT%"
+
 echo [INFO] Starting Schedule System...
 
 if not exist "streamlit_app\app.py" goto no_app
+
+REM If app is already running, only open browser.
+netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
+if not errorlevel 1 goto app_already_running
 
 set "PYTHON_EXE=%CD%\venv\Scripts\python.exe"
 if exist "%PYTHON_EXE%" (
@@ -38,11 +45,18 @@ if errorlevel 1 goto install_failed
 :run_app
 echo [INFO] Launching app in background (hidden console) ...
 powershell -NoProfile -ExecutionPolicy Bypass ^
-  -Command "Start-Process -FilePath '%PYTHON_EXE%' -ArgumentList '-m streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port 8501' -WorkingDirectory '%CD%' -WindowStyle Hidden"
+  -Command "Start-Process -FilePath '%PYTHON_EXE%' -ArgumentList '-m streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port %PORT%' -WorkingDirectory '%CD%' -WindowStyle Hidden"
 if errorlevel 1 goto launch_failed
 
 echo [INFO] Startup command issued.
-echo [INFO] Open: http://localhost:8501
+echo [INFO] Opening browser: %URL%
+start "" "%URL%"
+exit /b 0
+
+:app_already_running
+echo [INFO] App is already running on port %PORT%.
+echo [INFO] Opening browser: %URL%
+start "" "%URL%"
 exit /b 0
 
 :no_app
