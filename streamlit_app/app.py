@@ -4,13 +4,18 @@ import subprocess
 import threading
 from pathlib import Path
 
+from streamlit_app.logging_config import setup_logger
+
 st.set_page_config(layout="wide")
+
+logger = setup_logger("streamlit_app.app")
 
 st.title("外来スケジュール管理")
 st.write("メニュー")
 
 
 def _run_windows_bat(script_path: Path) -> tuple[bool, str]:
+    logger.info("running_windows_bat script=%s", script_path)
     completed = subprocess.run(
         ["cmd", "/c", str(script_path)],
         capture_output=True,
@@ -19,11 +24,17 @@ def _run_windows_bat(script_path: Path) -> tuple[bool, str]:
     )
     ok = completed.returncode == 0
     output = (completed.stdout or "") + (completed.stderr or "")
+    logger.info(
+        "windows_bat_completed script=%s returncode=%s",
+        script_path,
+        completed.returncode,
+    )
     return ok, output.strip()
 
 
 def _run_backup_and_shutdown() -> tuple[bool, str]:
     if os.name != "nt":
+        logger.warning("backup_and_shutdown_called_on_non_windows")
         return False, "この操作は Windows サーバー上でのみ利用できます。"
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -31,12 +42,19 @@ def _run_backup_and_shutdown() -> tuple[bool, str]:
     stop_bat = repo_root / "ops" / "windows" / "stop_app.bat"
 
     if not backup_bat.exists() or not stop_bat.exists():
+        logger.error(
+            "required_bat_not_found backup=%s stop=%s",
+            backup_bat,
+            stop_bat,
+        )
         return False, f"必要なバッチが見つかりません: {backup_bat} / {stop_bat}"
 
     backup_ok, backup_log = _run_windows_bat(backup_bat)
     if not backup_ok:
+        logger.error("backup_failed backup_bat=%s detail=%s", backup_bat, backup_log)
         return False, f"バックアップに失敗しました。\n{backup_log}"
 
+    logger.info("backup_success_starting_stop_app stop_bat=%s", stop_bat)
     threading.Thread(
         target=lambda: subprocess.run(["cmd", "/c", str(stop_bat)], check=False),
         daemon=True,
@@ -56,10 +74,14 @@ with st.sidebar:
     ):
         st.session_state["shutdown_started"] = True
         with st.spinner("バックアップして終了しています..."):
+            logger.info("backup_button_clicked")
             ok, message = _run_backup_and_shutdown()
         if not ok:
+            logger.error("backup_and_shutdown_failed message=%s", message)
             st.session_state["shutdown_started"] = False
             st.error(message)
+        else:
+            logger.info("backup_and_shutdown_completed")
 
 pages = [
     st.Page("pages/1_枠管理.py", title="枠管理"),
