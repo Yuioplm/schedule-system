@@ -6,6 +6,9 @@ cd /d "%~dp0..\.."
 
 set "PORT=8501"
 set "URL=http://localhost:%PORT%"
+set "RUNTIME_DIR=%CD%\.runtime"
+set "BROWSER_PID_FILE=%RUNTIME_DIR%\browser.pid"
+set "BROWSER_PROFILE_DIR=%RUNTIME_DIR%\browser_profile"
 
 echo [INFO] Starting Schedule System...
 
@@ -45,18 +48,18 @@ if errorlevel 1 goto install_failed
 :run_app
 echo [INFO] Launching app in background (hidden console) ...
 powershell -NoProfile -ExecutionPolicy Bypass ^
-  -Command "Start-Process -FilePath '%PYTHON_EXE%' -ArgumentList '-m streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port %PORT%' -WorkingDirectory '%CD%' -WindowStyle Hidden"
+  -Command "Start-Process -FilePath '%PYTHON_EXE%' -ArgumentList '-m streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port %PORT% --server.headless true' -WorkingDirectory '%CD%' -WindowStyle Hidden"
 if errorlevel 1 goto launch_failed
 
 echo [INFO] Startup command issued.
-echo [INFO] Opening browser: %URL%
-start "" "%URL%"
+echo [INFO] Opening browser window: %URL%
+call :open_browser_window
 exit /b 0
 
 :app_already_running
 echo [INFO] App is already running on port %PORT%.
-echo [INFO] Opening browser: %URL%
-start "" "%URL%"
+echo [INFO] Opening browser window: %URL%
+call :open_browser_window
 exit /b 0
 
 :no_app
@@ -113,3 +116,35 @@ echo [ERROR] Failed to launch Streamlit.
 echo [HINT] Run set_up.py once and check package installation.
 pause
 exit /b 1
+
+:open_browser_window
+if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
+if not exist "%BROWSER_PROFILE_DIR%" mkdir "%BROWSER_PROFILE_DIR%"
+
+set "BROWSER_EXE="
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+  set "BROWSER_EXE=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+) else if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+  set "BROWSER_EXE=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+) else if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
+  set "BROWSER_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
+  set "BROWSER_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+)
+
+if not "%BROWSER_EXE%"=="" goto open_app_browser
+
+echo [WARN] Edge/Chrome が見つからないため、既定ブラウザで開きます。
+start "" "%URL%"
+exit /b 0
+
+:open_app_browser
+powershell -NoProfile -ExecutionPolicy Bypass ^
+  -Command "$p = Start-Process -FilePath '%BROWSER_EXE%' -ArgumentList '--new-window','--app=%URL%','--user-data-dir=%BROWSER_PROFILE_DIR%' -PassThru; $p.Id | Set-Content -Path '%BROWSER_PID_FILE%' -Encoding ascii"
+if errorlevel 1 (
+  echo [WARN] 専用ウィンドウ起動に失敗したため、既定ブラウザで開きます。
+  start "" "%URL%"
+  exit /b 0
+)
+
+exit /b 0

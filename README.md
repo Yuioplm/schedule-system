@@ -223,6 +223,9 @@ Schedule-System/
 - `start_app.bat`
   - 仮想環境 (`.venv`) があれば自動有効化
   - `streamlit run streamlit_app/app.py --server.address 0.0.0.0 --server.port 8501` で起動
+- `start_app_silent.vbs`
+  - `start_app.bat` を**コマンドプロンプト非表示**で起動
+  - 運用担当者向けの通常起動はこちらを推奨
 - `backup_db.bat`
   - `database/schedule.db` を `backups` フォルダへ日時付きでコピー
   - 直近30日より古いバックアップを自動削除
@@ -231,7 +234,8 @@ Schedule-System/
 
 ### 9.1 使い方
 
-1. 朝: `ops/windows/start_app.bat` をダブルクリック
+1. 朝: `ops/windows/start_app_silent.vbs` をダブルクリック（非表示起動）
+   - トラブル調査時のみ `start_app.bat` を直接実行（エラーメッセージ確認用）
 2. 夜: `ops/windows/backup_db.bat` をダブルクリック
 
 `start_app.bat` は Streamlit をバックグラウンド起動（コンソール非表示）します。
