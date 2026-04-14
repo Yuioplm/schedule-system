@@ -10,3 +10,6 @@ database/*
 !database/.gitkeep
 # backup files
 backups/
+
+# application logs
+logs/

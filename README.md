@@ -14,6 +14,7 @@
 - **臨時外来**は `T_TemporarySchedule` に登録
 - **反映後予定**はビュー `V_ScheduleActual` で統合（通常枠 + 最新変更 + 臨時外来）
 - 各帳票ページは `sql/*.sql` を `streamlit_app/sql_loader.py` で読み込み実行
+- アプリログは `streamlit_app/logging_config.py` で設定し、`logs/app.log` にローテーション保存（10MB × 10世代）
 
 ---
 
@@ -164,6 +165,7 @@ streamlit run streamlit_app/app.py
 ```text
 Schedule-System/
 ├─ README.md
+├─ logs/  （実行時生成・Git管理外）
 ├─ requirements.txt
 ├─ set_up.py
 ├─ scripts/
@@ -213,6 +215,7 @@ Schedule-System/
 - DBファイル: `database/schedule.db`
 - マスタCSV: `csv/M_*.csv`
 - 初期枠CSV: `csv/T_ConsultationSlot.csv`
+- アプリログ: `logs/app.log`（ローテーション: 10MB × 10世代）
 
 ---
 
@@ -258,6 +261,8 @@ Schedule-System/
 表示内容に従って対応してください（例: ネットワーク/プロキシ設定確認）。
 
 ※ `activate` 実行は必須ではありません。`venv\Scripts\python.exe` を直接呼び出して起動します。
+
+運用時の実行ログは `logs/app.log` に出力されます（Git管理対象外）。
 
 ### 9.4 接続先URL
 
