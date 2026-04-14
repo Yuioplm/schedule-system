@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
+from streamlit_app.sql_loader import load_sql
 
 st.title("予定変更入力")
 conn = get_conn()
@@ -25,14 +26,7 @@ with tab1:
         st.write("診療科:", row["ClinDeptName"])
         st.write("時間:", row["TimeSlotName"])
 
-        change_type_df = pd.read_sql(
-            """
-            SELECT ChangeTypeID, ChangeTypeName
-            FROM M_ScheduleChangeType
-            ORDER BY ChangeTypeID
-            """,
-            conn,
-        )
+        change_type_df = pd.read_sql(load_sql("ScheduleChangeType_master.sql"), conn)
 
         if change_type_df.empty:
             st.error("M_ScheduleChangeType にデータがありません")

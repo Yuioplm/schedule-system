@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
+from streamlit_app.sql_loader import load_sql
 
 st.title("予定検索")
 
@@ -64,20 +65,7 @@ with col4:
 # ==========================
 # SQL組み立て
 # ==========================
-query = """
-SELECT
-    CalendarDate,
-    DayOfWeek,
-    ClinDeptName,
-    SpecialtyName,
-    TimeSlotName,
-    Room,
-    DoctorName,
-    DisplayDoctorName,
-    SlotID
-FROM V_ScheduleFull
-WHERE CalendarDate BETWEEN ? AND ?
-"""
+query = load_sql("ScheduleSearch_base.sql")
 
 params = [str(date_from), str(date_to)]
 

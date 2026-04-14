@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
+from streamlit_app.sql_loader import load_sql
 
 st.title("反映後予定検索")
 conn = get_conn()
@@ -70,35 +71,7 @@ with col5:
         format_func=lambda x: "(全て)" if x is None else f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
     )
 
-query = """
-SELECT
-    sa.CalendarDate AS 日付,
-    CASE strftime('%w', sa.CalendarDate)
-        WHEN '0' THEN '日'
-        WHEN '1' THEN '月'
-        WHEN '2' THEN '火'
-        WHEN '3' THEN '水'
-        WHEN '4' THEN '木'
-        WHEN '5' THEN '金'
-        WHEN '6' THEN '土'
-    END AS 曜日,
-    ts.TimeSlotName AS 時間帯,
-    cd.ClinDeptName AS 診療科,
-    sp.SpecialtyName AS 専門,
-    sa.Room AS 診察室,
-    d.DoctorName AS 医師,
-    sa.Rpt1DisplayDoctorName AS 帳票表示名,
-    sa.ChangeDetail AS 変更内容,
-    sa.Reason AS 備考,
-    CASE WHEN sa.SlotID IS NULL THEN '臨時外来' ELSE '通常枠' END AS 種別,
-    sa.SlotID AS SlotID
-FROM V_ScheduleActual sa
-LEFT JOIN M_TimeSlot ts ON sa.TimeSlotID = ts.TimeSlotID
-LEFT JOIN M_ClinicalDepartment cd ON sa.Rpt1ClinDeptID = cd.ClinDeptID
-LEFT JOIN M_Specialty sp ON sa.Rpt1SpecialtyID = sp.SpecialtyID
-LEFT JOIN M_Doctor d ON sa.DoctorID = d.DoctorID
-WHERE sa.CalendarDate BETWEEN ? AND ?
-"""
+query = load_sql("ActualScheduleSearch_base.sql")
 params = [str(date_from), str(date_to)]
 
 if selected_dept is not None:
