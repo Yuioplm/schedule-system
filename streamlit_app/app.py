@@ -41,16 +41,24 @@ def _run_backup_and_shutdown() -> tuple[bool, str]:
         target=lambda: subprocess.run(["cmd", "/c", str(stop_bat)], check=False),
         daemon=True,
     ).start()
-    return True, "バックアップを実行し、アプリ終了を開始しました。"
+    return True, ""
 
 
 with st.sidebar:
     st.markdown("---")
-    if st.button("💾 バックアップして終了", use_container_width=True, type="primary"):
-        ok, message = _run_backup_and_shutdown()
-        if ok:
-            st.success(message)
-        else:
+    shutdown_started = st.session_state.get("shutdown_started", False)
+
+    if st.button(
+        "💾 バックアップして終了",
+        use_container_width=True,
+        type="primary",
+        disabled=shutdown_started,
+    ):
+        st.session_state["shutdown_started"] = True
+        with st.spinner("バックアップして終了しています..."):
+            ok, message = _run_backup_and_shutdown()
+        if not ok:
+            st.session_state["shutdown_started"] = False
             st.error(message)
 
 pages = [
