@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
+from time import perf_counter
 
 from scripts.settings import get_conn
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 st.title("予定変更入力")
+log_page_open("予定変更入力")
 conn = get_conn()
 
 row = st.session_state.get("selected")
@@ -84,39 +87,65 @@ with tab1:
         changed_by = st.text_input("ChangedBy")
 
         if st.button("変更登録"):
-            rpt2_flag = 0 if hide_from_report2 else 1
-            conn.execute(
-                """
-                INSERT INTO T_ScheduleChange
-                (
-                    CalendarDate,
-                    SlotID,
-                    ChangeTypeID,
-                    ChangeDetail,
-                    NewDoctorID,
-                    NewTimeSlotID,
-                    NewRoom,
-                    Reason,
-                    ChangedBy,
-                    Rpt2Flag
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    row["CalendarDate"],
-                    row["SlotID"],
-                    change_type_id,
-                    detail if detail != "" else None,
-                    new_doctor_id,
-                    new_timeslot_id,
-                    new_room if new_room != "" else None,
-                    reason if reason != "" else None,
-                    changed_by if changed_by != "" else None,
-                    rpt2_flag,
-                ),
+            request_id = log_event(
+                "update_start",
+                "予定変更入力",
+                operation="register_schedule_change",
+                slot_id=row["SlotID"],
+                calendar_date=row["CalendarDate"],
             )
-            conn.commit()
-            st.success("変更を登録しました")
+            update_started_at = perf_counter()
+            rpt2_flag = 0 if hide_from_report2 else 1
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO T_ScheduleChange
+                    (
+                        CalendarDate,
+                        SlotID,
+                        ChangeTypeID,
+                        ChangeDetail,
+                        NewDoctorID,
+                        NewTimeSlotID,
+                        NewRoom,
+                        Reason,
+                        ChangedBy,
+                        Rpt2Flag
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["CalendarDate"],
+                        row["SlotID"],
+                        change_type_id,
+                        detail if detail != "" else None,
+                        new_doctor_id,
+                        new_timeslot_id,
+                        new_room if new_room != "" else None,
+                        reason if reason != "" else None,
+                        changed_by if changed_by != "" else None,
+                        rpt2_flag,
+                    ),
+                )
+                conn.commit()
+                elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                log_event(
+                    "update_success",
+                    "予定変更入力",
+                    request_id=request_id,
+                    operation="register_schedule_change",
+                    elapsed_ms=elapsed_ms,
+                )
+                st.success("変更を登録しました")
+            except Exception as exc:
+                log_event(
+                    "update_failed",
+                    "予定変更入力",
+                    request_id=request_id,
+                    operation="register_schedule_change",
+                    error=type(exc).__name__,
+                )
+                raise
 
 with tab2:
     st.caption("臨時外来（T_TemporarySchedule）を登録します")
@@ -184,35 +213,60 @@ with tab2:
             if temp_timeslot is None or temp_dept is None:
                 st.error("時間帯・診療科は必須です。未選択を解除してください。")
             else:
-                conn.execute(
-                    """
-                    INSERT INTO T_TemporarySchedule
-                    (
-                        CalendarDate,
-                        TimeSlotID,
-                        Rpt1ClinDeptID,
-                        Rpt1DisplayDoctorName,
-                        DoctorID,
-                        Room,
-                        ChangeDetail,
-                        Reason,
-                        ActiveFlag,
-                        Rpt2Flag
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        str(cal_date),
-                        int(temp_timeslot),
-                        int(temp_dept),
-                        temp_rpt2_before_doctor if temp_rpt2_before_doctor != "" else None,
-                        temp_doctor_id,
-                        temp_room if temp_room != "" else None,
-                        temp_detail if temp_detail != "" else None,
-                        temp_reason if temp_reason != "" else None,
-                        1 if temp_active else 0,
-                        0 if temp_hide_from_report2 else 1,
-                    ),
+                request_id = log_event(
+                    "update_start",
+                    "予定変更入力",
+                    operation="register_temporary_schedule",
+                    calendar_date=str(cal_date),
                 )
-                conn.commit()
-                st.success("臨時外来を登録しました")
+                update_started_at = perf_counter()
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO T_TemporarySchedule
+                        (
+                            CalendarDate,
+                            TimeSlotID,
+                            Rpt1ClinDeptID,
+                            Rpt1DisplayDoctorName,
+                            DoctorID,
+                            Room,
+                            ChangeDetail,
+                            Reason,
+                            ActiveFlag,
+                            Rpt2Flag
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(cal_date),
+                            int(temp_timeslot),
+                            int(temp_dept),
+                            temp_rpt2_before_doctor if temp_rpt2_before_doctor != "" else None,
+                            temp_doctor_id,
+                            temp_room if temp_room != "" else None,
+                            temp_detail if temp_detail != "" else None,
+                            temp_reason if temp_reason != "" else None,
+                            1 if temp_active else 0,
+                            0 if temp_hide_from_report2 else 1,
+                        ),
+                    )
+                    conn.commit()
+                    elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                    log_event(
+                        "update_success",
+                        "予定変更入力",
+                        request_id=request_id,
+                        operation="register_temporary_schedule",
+                        elapsed_ms=elapsed_ms,
+                    )
+                    st.success("臨時外来を登録しました")
+                except Exception as exc:
+                    log_event(
+                        "update_failed",
+                        "予定変更入力",
+                        request_id=request_id,
+                        operation="register_temporary_schedule",
+                        error=type(exc).__name__,
+                    )
+                    raise

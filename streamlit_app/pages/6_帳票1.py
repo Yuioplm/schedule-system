@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 import re
+from time import perf_counter
 
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
-
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 
@@ -101,6 +102,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
 
 st.set_page_config(layout="wide")
 st.title("帳票① 外来担当医表")
+log_page_open("帳票① 外来担当医表")
 
 conn = get_conn()
 
@@ -121,11 +123,47 @@ sql_name = "Report1_pivot.sql" if subcategory == "院内用" else "Report1_pivot
 
 target_month = f"{int(year)}-{int(month):02d}"
 query = load_sql(sql_name)
-df = pd.read_sql(query, conn, params={"target_month": target_month})
+request_id = log_event(
+    "report_generate_start",
+    "帳票① 外来担当医表",
+    report_id="report1",
+    subcategory=subcategory,
+    target_month=target_month,
+)
+report_started_at = perf_counter()
+try:
+    df = pd.read_sql(query, conn, params={"target_month": target_month})
+except Exception as exc:
+    log_event(
+        "report_generate_failed",
+        "帳票① 外来担当医表",
+        request_id=request_id,
+        report_id="report1",
+        error=type(exc).__name__,
+    )
+    raise
 
 if df.empty:
+    elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+    log_event(
+        "report_generate_success",
+        "帳票① 外来担当医表",
+        request_id=request_id,
+        report_id="report1",
+        result_count=0,
+        elapsed_ms=elapsed_ms,
+    )
     st.warning("対象月のデータがありません")
 else:
+    elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+    log_event(
+        "report_generate_success",
+        "帳票① 外来担当医表",
+        request_id=request_id,
+        report_id="report1",
+        result_count=len(df),
+        elapsed_ms=elapsed_ms,
+    )
     display_mode = st.radio(
         "画面表示形式",
         ["改行表示", "区切り表示（ / ）"],
@@ -190,6 +228,14 @@ else:
 
     if template_file is not None:
         template_bytes = template_file.getvalue()
+        template_request_id = log_event(
+            "report_generate_start",
+            "帳票① 外来担当医表",
+            report_id="report1_template",
+            subcategory=subcategory,
+            target_month=target_month,
+        )
+        template_started_at = perf_counter()
         try:
             workbook = load_workbook(BytesIO(template_bytes))
             worksheet = workbook.active
@@ -208,5 +254,21 @@ else:
                 file_name=f"帳票①_外来担当医表_{subcategory}_{target_month}_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+            template_elapsed_ms = int((perf_counter() - template_started_at) * 1000)
+            log_event(
+                "report_generate_success",
+                "帳票① 外来担当医表",
+                request_id=template_request_id,
+                report_id="report1_template",
+                result_count=len(df),
+                elapsed_ms=template_elapsed_ms,
+            )
         except Exception as exc:
+            log_event(
+                "report_generate_failed",
+                "帳票① 外来担当医表",
+                request_id=template_request_id,
+                report_id="report1_template",
+                error=type(exc).__name__,
+            )
             st.error(f"テンプレートExcelへの反映に失敗しました: {exc}")

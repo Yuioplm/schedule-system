@@ -1,14 +1,16 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from time import perf_counter
 
 from scripts.settings import get_conn
-
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 conn = get_conn()
 
 st.title("帳票➃ 常勤日別コマ数")
+log_page_open("帳票➃ 常勤日別コマ数")
 
 years = list(range(2025, 2028))
 months = list(range(1, 13))
@@ -24,7 +26,25 @@ end_date = pd.to_datetime(start_date) + pd.offsets.MonthEnd(1)
 end_date = end_date.strftime("%Y-%m-%d")
 
 query = load_sql("Report4.sql")
-df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
+request_id = log_event(
+    "report_generate_start",
+    "帳票➃ 常勤日別コマ数",
+    report_id="report4",
+    start_date=start_date,
+    end_date=end_date,
+)
+report_started_at = perf_counter()
+try:
+    df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
+except Exception as exc:
+    log_event(
+        "report_generate_failed",
+        "帳票➃ 常勤日別コマ数",
+        request_id=request_id,
+        report_id="report4",
+        error=type(exc).__name__,
+    )
+    raise
 
 if not df.empty:
     df["Rpt4ClinDeptID"] = df["Rpt4ClinDeptID"].fillna(0)
@@ -59,6 +79,15 @@ if not df.empty:
     for col in numeric_cols:
         total_row[col] = pivot[col].sum()
     pivot = pd.concat([pivot, pd.DataFrame([total_row])], ignore_index=True)
+    elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+    log_event(
+        "report_generate_success",
+        "帳票➃ 常勤日別コマ数",
+        request_id=request_id,
+        report_id="report4",
+        result_count=len(pivot),
+        elapsed_ms=elapsed_ms,
+    )
 
     st.dataframe(pivot, use_container_width=True)
 
@@ -70,4 +99,13 @@ if not df.empty:
         mime="text/csv",
     )
 else:
+    elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+    log_event(
+        "report_generate_success",
+        "帳票➃ 常勤日別コマ数",
+        request_id=request_id,
+        report_id="report4",
+        result_count=0,
+        elapsed_ms=elapsed_ms,
+    )
     st.warning("データがありません")

@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
+from time import perf_counter
 
 from scripts.settings import get_conn
+from streamlit_app.log_events import log_event, log_page_open
 
 
 st.title("マスタ管理")
+log_page_open("マスタ管理")
 conn = get_conn()
 
 
@@ -133,14 +136,42 @@ def render_master_ui(config: dict):
 
             submitted = st.form_submit_button("更新")
             if submitted:
+                request_id = log_event(
+                    "update_start",
+                    "マスタ管理",
+                    operation="update_master",
+                    table=table,
+                    target_id=selected_id,
+                )
+                update_started_at = perf_counter()
                 set_clause = ", ".join([f"{k} = ?" for k in values.keys()])
                 params = list(values.values()) + [selected_id]
-                conn.execute(
-                    f"UPDATE {table} SET {set_clause} WHERE {pk} = ?",
-                    params,
-                )
-                conn.commit()
-                st.success("更新しました。")
+                try:
+                    conn.execute(
+                        f"UPDATE {table} SET {set_clause} WHERE {pk} = ?",
+                        params,
+                    )
+                    conn.commit()
+                    elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                    log_event(
+                        "update_success",
+                        "マスタ管理",
+                        request_id=request_id,
+                        operation="update_master",
+                        table=table,
+                        elapsed_ms=elapsed_ms,
+                    )
+                    st.success("更新しました。")
+                except Exception as exc:
+                    log_event(
+                        "update_failed",
+                        "マスタ管理",
+                        request_id=request_id,
+                        operation="update_master",
+                        table=table,
+                        error=type(exc).__name__,
+                    )
+                    raise
 
     with st.form(f"create_form_{table}"):
         st.subheader("新規登録")
@@ -157,15 +188,43 @@ def render_master_ui(config: dict):
 
         submitted_new = st.form_submit_button("登録")
         if submitted_new:
+            request_id = log_event(
+                "update_start",
+                "マスタ管理",
+                operation="insert_master",
+                table=table,
+                target_id=int(new_id),
+            )
+            update_started_at = perf_counter()
             columns = [pk] + list(new_values.keys())
             placeholders = ",".join(["?"] * len(columns))
             params = [int(new_id)] + list(new_values.values())
-            conn.execute(
-                f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
-                params,
-            )
-            conn.commit()
-            st.success("登録しました。")
+            try:
+                conn.execute(
+                    f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
+                    params,
+                )
+                conn.commit()
+                elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                log_event(
+                    "update_success",
+                    "マスタ管理",
+                    request_id=request_id,
+                    operation="insert_master",
+                    table=table,
+                    elapsed_ms=elapsed_ms,
+                )
+                st.success("登録しました。")
+            except Exception as exc:
+                log_event(
+                    "update_failed",
+                    "マスタ管理",
+                    request_id=request_id,
+                    operation="insert_master",
+                    table=table,
+                    error=type(exc).__name__,
+                )
+                raise
 
 
 master_tabs = st.tabs([cfg["tab"] for cfg in MASTER_CONFIGS])

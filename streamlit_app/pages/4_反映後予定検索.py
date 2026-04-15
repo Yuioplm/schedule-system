@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
+from time import perf_counter
 
 from scripts.settings import get_conn
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 st.title("反映後予定検索")
+log_page_open("反映後予定検索")
 conn = get_conn()
 
 st.caption("V_ScheduleActual をもとに、予定変更・臨時外来を反映済みの一覧を検索します。")
@@ -83,7 +86,35 @@ if selected_timeslot is not None:
 
 query += " ORDER BY sa.CalendarDate, sa.TimeSlotID, sa.Rpt1ClinDeptID, sa.SlotID"
 
-result_df = pd.read_sql(query, conn, params=params)
+request_id = log_event(
+    "search_execute",
+    "反映後予定検索",
+    date_from=str(date_from),
+    date_to=str(date_to),
+    has_dept_filter=selected_dept is not None,
+    has_doctor_filter=selected_doctor is not None,
+    has_timeslot_filter=selected_timeslot is not None,
+)
+search_started_at = perf_counter()
+try:
+    result_df = pd.read_sql(query, conn, params=params)
+except Exception as exc:
+    log_event(
+        "search_failed",
+        "反映後予定検索",
+        request_id=request_id,
+        error=type(exc).__name__,
+    )
+    raise
+
+elapsed_ms = int((perf_counter() - search_started_at) * 1000)
+log_event(
+    "search_result",
+    "反映後予定検索",
+    request_id=request_id,
+    result_count=len(result_df),
+    elapsed_ms=elapsed_ms,
+)
 
 st.subheader("検索結果")
 if result_df.empty:
