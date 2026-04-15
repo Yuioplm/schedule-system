@@ -13,3 +13,6 @@ backups/
 
 # application logs
 logs/
+
+# runtime temp files
+.runtime/

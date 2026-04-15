@@ -160,9 +160,16 @@ streamlit run streamlit_app/app.py
 ```text
 Schedule-System/
 ├─ README.md
+├─ database/  （実行時生成・Git管理外）
+│  └─ schedule.db
+├─ csv/  （運用データ配置・Git管理外）
+│  ├─ M_*.csv
+│  └─ T_ConsultationSlot.csv
 ├─ docs/
 │  └─ 担当者マニュアル.md
 ├─ logs/  （実行時生成・Git管理外）
+├─ backups/  （バックアップ先・Git管理外）
+├─ .runtime/  （ランタイム一時領域・Git管理外）
 ├─ requirements.txt
 ├─ set_up.py
 ├─ scripts/
