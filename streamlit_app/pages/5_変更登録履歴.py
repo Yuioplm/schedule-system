@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import sys
-from pathlib import Path
 from io import BytesIO
 import re
 import zipfile
@@ -11,7 +9,6 @@ from xml.sax.saxutils import escape
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 from streamlit_app.sql_loader import load_sql
 
@@ -154,22 +151,6 @@ def replace_cell_value_with_inline_string(sheet_xml: str, cell_ref: str, text: s
     return replaced_xml, count > 0
 
 
-def ensure_output_history_table(conn) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS T_ChangeNoticeOutputHistory (
-            OutputHistoryID INTEGER PRIMARY KEY,
-            TargetType TEXT NOT NULL,
-            TargetID INTEGER NOT NULL,
-            OutputBy TEXT,
-            OutputDate DATE,
-            CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours'))
-        )
-        """
-    )
-    conn.commit()
-
-
 def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_date: str) -> None:
     if target_df.empty:
         return
@@ -191,7 +172,6 @@ def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_da
 
 st.title("変更登録履歴検索")
 conn = get_conn()
-ensure_output_history_table(conn)
 
 st.caption("予定変更入力・臨時外来登録の入力内容を、非表示設定を含めて確認できます。")
 

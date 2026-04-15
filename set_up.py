@@ -25,6 +25,7 @@ def main() -> None:
     run("scripts/generate_holiday_master.py")
     run("scripts/import_consultation_slot.py")
     run("scripts/fix_date_format.py")
+    run("scripts/migrate.py")
 
     print("\n====== Setup Completed ======")
     logger.info("setup_completed")

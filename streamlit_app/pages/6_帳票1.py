@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-from pathlib import Path
-import sys
 from io import BytesIO
 import re
 
@@ -9,8 +7,6 @@ from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
-
-sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from streamlit_app.sql_loader import load_sql
 

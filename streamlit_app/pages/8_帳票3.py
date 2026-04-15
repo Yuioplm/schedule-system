@@ -1,12 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from pathlib import Path
-import sys
 
 from scripts.settings import get_conn
-
-sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from streamlit_app.sql_loader import load_sql
 
