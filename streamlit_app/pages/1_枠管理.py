@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
+from time import perf_counter
 
 from scripts.settings import get_conn
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 st.set_page_config(layout="wide")
@@ -75,6 +77,7 @@ def _safe_day_of_week(value, default: int = 1) -> int:
 
 
 st.title("枠管理")
+log_page_open("枠管理")
 conn = get_conn()
 
 slot_query = load_sql("ConsultationSlot_list.sql")
@@ -243,50 +246,75 @@ else:
         submitted_update = st.form_submit_button("更新")
 
         if submitted_update:
-            conn.execute(
-                """
-                UPDATE T_ConsultationSlot
-                SET
-                    Rpt1ClinDeptID = ?,
-                    Rpt1SpecialtyID = ?,
-                    Rpt2ClinDeptID = ?,
-                    Rpt3ClinDeptID = ?,
-                    Rpt4ClinDeptID = ?,
-                    Rpt5ClinDeptID = ?,
-                    Rpt6ClinDeptID = ?,
-                    DoctorID = ?,
-                    TimeSlotID = ?,
-                    Room = ?,
-                    DayOfWeek = ?,
-                    WeekPattern = ?,
-                    StartDate = ?,
-                    EndDate = ?,
-                    Rpt1DisplayDoctorName = ?,
-                    ActiveFlag = ?
-                WHERE SlotID = ?
-                """,
-                (
-                    edit_dept_id if edit_dept_id is None else int(edit_dept_id),
-                    edit_specialty_id if edit_specialty_id is None else int(edit_specialty_id),
-                    edit_rpt2_dept_id if edit_rpt2_dept_id is None else int(edit_rpt2_dept_id),
-                    edit_rpt3_dept_id if edit_rpt3_dept_id is None else int(edit_rpt3_dept_id),
-                    edit_rpt4_dept_id if edit_rpt4_dept_id is None else int(edit_rpt4_dept_id),
-                    edit_rpt5_dept_id if edit_rpt5_dept_id is None else int(edit_rpt5_dept_id),
-                    edit_rpt6_dept_id if edit_rpt6_dept_id is None else int(edit_rpt6_dept_id),
-                    edit_doctor_id if edit_doctor_id is None else int(edit_doctor_id),
-                    edit_timeslot_id if edit_timeslot_id is None else int(edit_timeslot_id),
-                    edit_room if edit_room != "" else None,
-                    edit_day if edit_day is None else int(edit_day),
-                    edit_weekpattern,
-                    str(edit_start),
-                    "9999-12-31" if edit_open_end else str(edit_end),
-                    edit_display_name if edit_display_name != "" else None,
-                    1 if edit_active else 0,
-                    int(selected_slot_id),
-                ),
+            request_id = log_event(
+                "update_start",
+                "枠管理",
+                operation="update_consultation_slot",
+                target_id=int(selected_slot_id),
             )
-            conn.commit()
-            st.success("枠を更新しました。画面を再読み込みすると一覧に反映されます。")
+            update_started_at = perf_counter()
+            try:
+                conn.execute(
+                    """
+                    UPDATE T_ConsultationSlot
+                    SET
+                        Rpt1ClinDeptID = ?,
+                        Rpt1SpecialtyID = ?,
+                        Rpt2ClinDeptID = ?,
+                        Rpt3ClinDeptID = ?,
+                        Rpt4ClinDeptID = ?,
+                        Rpt5ClinDeptID = ?,
+                        Rpt6ClinDeptID = ?,
+                        DoctorID = ?,
+                        TimeSlotID = ?,
+                        Room = ?,
+                        DayOfWeek = ?,
+                        WeekPattern = ?,
+                        StartDate = ?,
+                        EndDate = ?,
+                        Rpt1DisplayDoctorName = ?,
+                        ActiveFlag = ?
+                    WHERE SlotID = ?
+                    """,
+                    (
+                        edit_dept_id if edit_dept_id is None else int(edit_dept_id),
+                        edit_specialty_id if edit_specialty_id is None else int(edit_specialty_id),
+                        edit_rpt2_dept_id if edit_rpt2_dept_id is None else int(edit_rpt2_dept_id),
+                        edit_rpt3_dept_id if edit_rpt3_dept_id is None else int(edit_rpt3_dept_id),
+                        edit_rpt4_dept_id if edit_rpt4_dept_id is None else int(edit_rpt4_dept_id),
+                        edit_rpt5_dept_id if edit_rpt5_dept_id is None else int(edit_rpt5_dept_id),
+                        edit_rpt6_dept_id if edit_rpt6_dept_id is None else int(edit_rpt6_dept_id),
+                        edit_doctor_id if edit_doctor_id is None else int(edit_doctor_id),
+                        edit_timeslot_id if edit_timeslot_id is None else int(edit_timeslot_id),
+                        edit_room if edit_room != "" else None,
+                        edit_day if edit_day is None else int(edit_day),
+                        edit_weekpattern,
+                        str(edit_start),
+                        "9999-12-31" if edit_open_end else str(edit_end),
+                        edit_display_name if edit_display_name != "" else None,
+                        1 if edit_active else 0,
+                        int(selected_slot_id),
+                    ),
+                )
+                conn.commit()
+                elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                log_event(
+                    "update_success",
+                    "枠管理",
+                    request_id=request_id,
+                    operation="update_consultation_slot",
+                    elapsed_ms=elapsed_ms,
+                )
+                st.success("枠を更新しました。画面を再読み込みすると一覧に反映されます。")
+            except Exception as exc:
+                log_event(
+                    "update_failed",
+                    "枠管理",
+                    request_id=request_id,
+                    operation="update_consultation_slot",
+                    error=type(exc).__name__,
+                )
+                raise
 
 st.divider()
 st.subheader("新規枠追加（検索選択式）")
@@ -410,45 +438,69 @@ with st.form("create_slot_form"):
 
     submitted_create = st.form_submit_button("新規登録")
     if submitted_create:
-        conn.execute(
-            """
-            INSERT INTO T_ConsultationSlot
-            (
-                Rpt1ClinDeptID,
-                Rpt1SpecialtyID,
-                Rpt2ClinDeptID,
-                Rpt3ClinDeptID,
-                Rpt4ClinDeptID,
-                Rpt5ClinDeptID,
-                Rpt6ClinDeptID,
-                DoctorID,
-                TimeSlotID,
-                Room,
-                DayOfWeek,
-                WeekPattern,
-                StartDate,
-                EndDate,
-                Rpt1DisplayDoctorName
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                new_dept_id if new_dept_id is None else int(new_dept_id),
-                new_specialty_id if new_specialty_id is None else int(new_specialty_id),
-                new_rpt2_dept_id if new_rpt2_dept_id is None else int(new_rpt2_dept_id),
-                new_rpt3_dept_id if new_rpt3_dept_id is None else int(new_rpt3_dept_id),
-                new_rpt4_dept_id if new_rpt4_dept_id is None else int(new_rpt4_dept_id),
-                new_rpt5_dept_id if new_rpt5_dept_id is None else int(new_rpt5_dept_id),
-                new_rpt6_dept_id if new_rpt6_dept_id is None else int(new_rpt6_dept_id),
-                new_doctor_id if new_doctor_id is None else int(new_doctor_id),
-                new_timeslot_id if new_timeslot_id is None else int(new_timeslot_id),
-                new_room if new_room != "" else None,
-                new_day if new_day is None else int(new_day),
-                new_weekpattern,
-                str(new_start),
-                "9999-12-31" if new_open_end else str(new_end),
-                new_display_name if new_display_name != "" else None,
-            ),
+        request_id = log_event(
+            "update_start",
+            "枠管理",
+            operation="insert_consultation_slot",
         )
-        conn.commit()
-        st.success("新規枠を登録しました。")
+        update_started_at = perf_counter()
+        try:
+            conn.execute(
+                """
+                INSERT INTO T_ConsultationSlot
+                (
+                    Rpt1ClinDeptID,
+                    Rpt1SpecialtyID,
+                    Rpt2ClinDeptID,
+                    Rpt3ClinDeptID,
+                    Rpt4ClinDeptID,
+                    Rpt5ClinDeptID,
+                    Rpt6ClinDeptID,
+                    DoctorID,
+                    TimeSlotID,
+                    Room,
+                    DayOfWeek,
+                    WeekPattern,
+                    StartDate,
+                    EndDate,
+                    Rpt1DisplayDoctorName
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_dept_id if new_dept_id is None else int(new_dept_id),
+                    new_specialty_id if new_specialty_id is None else int(new_specialty_id),
+                    new_rpt2_dept_id if new_rpt2_dept_id is None else int(new_rpt2_dept_id),
+                    new_rpt3_dept_id if new_rpt3_dept_id is None else int(new_rpt3_dept_id),
+                    new_rpt4_dept_id if new_rpt4_dept_id is None else int(new_rpt4_dept_id),
+                    new_rpt5_dept_id if new_rpt5_dept_id is None else int(new_rpt5_dept_id),
+                    new_rpt6_dept_id if new_rpt6_dept_id is None else int(new_rpt6_dept_id),
+                    new_doctor_id if new_doctor_id is None else int(new_doctor_id),
+                    new_timeslot_id if new_timeslot_id is None else int(new_timeslot_id),
+                    new_room if new_room != "" else None,
+                    new_day if new_day is None else int(new_day),
+                    new_weekpattern,
+                    str(new_start),
+                    "9999-12-31" if new_open_end else str(new_end),
+                    new_display_name if new_display_name != "" else None,
+                ),
+            )
+            conn.commit()
+            elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+            log_event(
+                "update_success",
+                "枠管理",
+                request_id=request_id,
+                operation="insert_consultation_slot",
+                elapsed_ms=elapsed_ms,
+            )
+            st.success("新規枠を登録しました。")
+        except Exception as exc:
+            log_event(
+                "update_failed",
+                "枠管理",
+                request_id=request_id,
+                operation="insert_consultation_slot",
+                error=type(exc).__name__,
+            )
+            raise

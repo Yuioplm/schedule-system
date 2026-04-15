@@ -2,6 +2,7 @@ import calendar
 from datetime import datetime
 from io import BytesIO
 import re
+from time import perf_counter
 
 import pandas as pd
 import streamlit as st
@@ -9,7 +10,7 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl import load_workbook
 
 from scripts.settings import get_conn
-
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 
@@ -200,6 +201,7 @@ def write_doctor_sheet(
 
 st.set_page_config(layout="wide")
 st.title("帳票⑥ 非常勤医師勤務報告書")
+log_page_open("帳票⑥ 非常勤医師勤務報告書")
 
 conn = get_conn()
 
@@ -215,12 +217,39 @@ with col2:
 start_date = f"{int(year)}-{int(month):02d}-01"
 end_date = f"{int(year)}-{int(month):02d}-{calendar.monthrange(int(year), int(month))[1]:02d}"
 
-doctor_df = fetch_eligible_doctors(conn, start_date, end_date)
+request_id = log_event(
+    "report_generate_start",
+    "帳票⑥ 非常勤医師勤務報告書",
+    report_id="report6",
+    start_date=start_date,
+    end_date=end_date,
+)
+report_started_at = perf_counter()
+try:
+    doctor_df = fetch_eligible_doctors(conn, start_date, end_date)
+    report6_source_df = fetch_report6_rows(conn, start_date, end_date)
+except Exception as exc:
+    log_event(
+        "report_generate_failed",
+        "帳票⑥ 非常勤医師勤務報告書",
+        request_id=request_id,
+        report_id="report6",
+        error=type(exc).__name__,
+    )
+    raise
+
 if doctor_df.empty:
+    elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+    log_event(
+        "report_generate_success",
+        "帳票⑥ 非常勤医師勤務報告書",
+        request_id=request_id,
+        report_id="report6",
+        result_count=0,
+        elapsed_ms=elapsed_ms,
+    )
     st.warning("選択月に外来予定または実績がある非常勤医師がいません")
     st.stop()
-
-report6_source_df = fetch_report6_rows(conn, start_date, end_date)
 
 doctor_df["所属"] = doctor_df["所属"].fillna("")
 department_options = ["(全て)"] + sorted([x for x in doctor_df["所属"].unique().tolist() if x])
@@ -252,6 +281,15 @@ preview_df = build_report_dataframe(
     month=int(month),
     source_df=report6_source_df,
 )
+elapsed_ms = int((perf_counter() - report_started_at) * 1000)
+log_event(
+    "report_generate_success",
+    "帳票⑥ 非常勤医師勤務報告書",
+    request_id=request_id,
+    report_id="report6",
+    result_count=len(preview_df),
+    elapsed_ms=elapsed_ms,
+)
 
 st.markdown("#### 個人別プレビュー")
 st.dataframe(preview_df, use_container_width=True)
@@ -272,6 +310,14 @@ st.caption("日別カラム指定プレースホルダ: {{1|曜日}}, {{5|AM勤�
 template_file = st.file_uploader("帳票⑥Excelテンプレート（.xlsx）", type=["xlsx"])
 
 if template_file is not None:
+    template_request_id = log_event(
+        "report_generate_start",
+        "帳票⑥ 非常勤医師勤務報告書",
+        report_id="report6_template",
+        start_date=start_date,
+        end_date=end_date,
+    )
+    template_started_at = perf_counter()
     try:
         wb = load_workbook(BytesIO(template_file.getvalue()))
         base_ws = wb.active
@@ -335,5 +381,21 @@ if template_file is not None:
                 file_name=f"帳票⑥_非常勤医師勤務報告書_{year}_{int(month):02d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+            template_elapsed_ms = int((perf_counter() - template_started_at) * 1000)
+            log_event(
+                "report_generate_success",
+                "帳票⑥ 非常勤医師勤務報告書",
+                request_id=template_request_id,
+                report_id="report6_template",
+                result_count=len(doctor_rows),
+                elapsed_ms=template_elapsed_ms,
+            )
     except Exception as exc:
+        log_event(
+            "report_generate_failed",
+            "帳票⑥ 非常勤医師勤務報告書",
+            request_id=template_request_id,
+            report_id="report6_template",
+            error=type(exc).__name__,
+        )
         st.error(f"Excel生成に失敗しました: {exc}")

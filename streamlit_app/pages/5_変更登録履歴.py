@@ -5,11 +5,13 @@ import re
 import zipfile
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
+from time import perf_counter
 
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
+from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
 
@@ -171,6 +173,7 @@ def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_da
 
 
 st.title("変更登録履歴検索")
+log_page_open("変更登録履歴検索")
 conn = get_conn()
 
 st.caption("予定変更入力・臨時外来登録の入力内容を、非表示設定を含めて確認できます。")
@@ -185,11 +188,36 @@ show_inactive = st.checkbox("無効化済み(ActiveFlag=0)も表示", value=Fals
 
 query = load_sql("ChangeHistory_search.sql")
 
+request_id = log_event(
+    "search_execute",
+    "変更登録履歴検索",
+    date_from=str(date_from),
+    date_to=str(date_to),
+    show_inactive=show_inactive,
+)
+search_started_at = perf_counter()
+try:
+    result_df = pd.read_sql(
+        query,
+        conn,
+        params=[str(date_from), str(date_to), str(date_from), str(date_to), 1 if show_inactive else 0],
+    )
+except Exception as exc:
+    log_event(
+        "search_failed",
+        "変更登録履歴検索",
+        request_id=request_id,
+        error=type(exc).__name__,
+    )
+    raise
 
-result_df = pd.read_sql(
-    query,
-    conn,
-    params=[str(date_from), str(date_to), str(date_from), str(date_to), 1 if show_inactive else 0],
+elapsed_ms = int((perf_counter() - search_started_at) * 1000)
+log_event(
+    "search_result",
+    "変更登録履歴検索",
+    request_id=request_id,
+    result_count=len(result_df),
+    elapsed_ms=elapsed_ms,
 )
 if not result_df.empty:
     result_df["日付"] = pd.to_datetime(result_df["日付"])
@@ -350,65 +378,96 @@ else:
         submitted_edit = st.form_submit_button("更新")
 
         if submitted_edit:
+            update_request_id = log_event(
+                "update_start",
+                "変更登録履歴検索",
+                operation="edit_history",
+                target_type=selected_row["登録種別"],
+                target_id=int(selected_row["レコードID"]),
+            )
+            update_started_at = perf_counter()
             if is_normal_change:
-                conn.execute(
-                    """
-                    UPDATE T_ScheduleChange
-                    SET
-                        ChangeTypeID = ?,
-                        NewDoctorID = ?,
-                        ChangeDetail = ?,
-                        Reason = ?,
-                        ChangedBy = ?,
-                        Rpt2Flag = ?,
-                        ActiveFlag = ?
-                    WHERE ChangeID = ?
-                    """,
-                    (
-                        int(edit_change_type_id),
-                        edit_doctor_id,
-                        edit_detail if edit_detail != "" else None,
-                        edit_reason if edit_reason != "" else None,
-                        edit_changed_by if edit_changed_by != "" else None,
-                        1 if edit_visible_report2 else 0,
-                        1 if edit_active else 0,
-                        int(selected_row["レコードID"]),
-                    ),
-                )
+                operation = "update_schedule_change"
             else:
-                conn.execute(
-                    """
-                    UPDATE T_TemporarySchedule
-                    SET
-                        CalendarDate = ?,
-                        TimeSlotID = ?,
-                        Rpt1ClinDeptID = ?,
-                        DoctorID = ?,
-                        Room = ?,
-                        Rpt1DisplayDoctorName = ?,
-                        ChangeDetail = ?,
-                        Reason = ?,
-                        Rpt2Flag = ?,
-                        ActiveFlag = ?
-                    WHERE TempID = ?
-                    """,
-                    (
-                        str(edit_date),
-                        int(edit_timeslot_id),
-                        int(edit_dept_id),
-                        edit_doctor_id,
-                        edit_room if edit_room != "" else None,
-                        edit_rpt2_before_doctor if edit_rpt2_before_doctor != "" else None,
-                        edit_detail if edit_detail != "" else None,
-                        edit_reason if edit_reason != "" else None,
-                        1 if edit_visible_report2 else 0,
-                        1 if edit_active else 0,
-                        int(selected_row["レコードID"]),
-                    ),
-                )
+                operation = "update_temporary_schedule"
 
-            conn.commit()
-            st.success("登録内容を更新しました。再検索して最新状態を確認してください。")
+            try:
+                if is_normal_change:
+                    conn.execute(
+                        """
+                        UPDATE T_ScheduleChange
+                        SET
+                            ChangeTypeID = ?,
+                            NewDoctorID = ?,
+                            ChangeDetail = ?,
+                            Reason = ?,
+                            ChangedBy = ?,
+                            Rpt2Flag = ?,
+                            ActiveFlag = ?
+                        WHERE ChangeID = ?
+                        """,
+                        (
+                            int(edit_change_type_id),
+                            edit_doctor_id,
+                            edit_detail if edit_detail != "" else None,
+                            edit_reason if edit_reason != "" else None,
+                            edit_changed_by if edit_changed_by != "" else None,
+                            1 if edit_visible_report2 else 0,
+                            1 if edit_active else 0,
+                            int(selected_row["レコードID"]),
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        UPDATE T_TemporarySchedule
+                        SET
+                            CalendarDate = ?,
+                            TimeSlotID = ?,
+                            Rpt1ClinDeptID = ?,
+                            DoctorID = ?,
+                            Room = ?,
+                            Rpt1DisplayDoctorName = ?,
+                            ChangeDetail = ?,
+                            Reason = ?,
+                            Rpt2Flag = ?,
+                            ActiveFlag = ?
+                        WHERE TempID = ?
+                        """,
+                        (
+                            str(edit_date),
+                            int(edit_timeslot_id),
+                            int(edit_dept_id),
+                            edit_doctor_id,
+                            edit_room if edit_room != "" else None,
+                            edit_rpt2_before_doctor if edit_rpt2_before_doctor != "" else None,
+                            edit_detail if edit_detail != "" else None,
+                            edit_reason if edit_reason != "" else None,
+                            1 if edit_visible_report2 else 0,
+                            1 if edit_active else 0,
+                            int(selected_row["レコードID"]),
+                        ),
+                    )
+
+                conn.commit()
+                update_elapsed_ms = int((perf_counter() - update_started_at) * 1000)
+                log_event(
+                    "update_success",
+                    "変更登録履歴検索",
+                    request_id=update_request_id,
+                    operation=operation,
+                    elapsed_ms=update_elapsed_ms,
+                )
+                st.success("登録内容を更新しました。再検索して最新状態を確認してください。")
+            except Exception as exc:
+                log_event(
+                    "update_failed",
+                    "変更登録履歴検索",
+                    request_id=update_request_id,
+                    operation=operation,
+                    error=type(exc).__name__,
+                )
+                raise
 
     st.markdown("---")
     st.subheader("変更届データ出力")
