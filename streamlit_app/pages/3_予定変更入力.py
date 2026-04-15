@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import sys
-from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
 from scripts.settings import get_conn
 from streamlit_app.sql_loader import load_sql
 
@@ -181,11 +178,6 @@ with tab2:
             key="temp_hide_from_report2",
             help="チェックすると帳票➁ 予定変更一覧に表示されません",
         )
-
-        temp_columns = pd.read_sql("PRAGMA table_info(T_TemporarySchedule)", conn)["name"].tolist()
-        if "Rpt2Flag" not in temp_columns:
-            conn.execute("ALTER TABLE T_TemporarySchedule ADD COLUMN Rpt2Flag INTEGER DEFAULT 1")
-            conn.commit()
 
         submitted_temp = st.form_submit_button("臨時外来を登録")
         if submitted_temp:

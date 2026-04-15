@@ -1,9 +1,7 @@
 import calendar
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 import re
-import sys
 
 import pandas as pd
 import streamlit as st
@@ -11,8 +9,6 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl import load_workbook
 
 from scripts.settings import get_conn
-
-sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from streamlit_app.sql_loader import load_sql
 
