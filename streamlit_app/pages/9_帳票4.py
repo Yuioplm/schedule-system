@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from time import perf_counter
 
-from scripts.settings import get_conn
+from scripts.settings import get_conn, get_available_years
 from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
@@ -12,12 +12,13 @@ conn = get_conn()
 st.title("帳票➃ 常勤日別コマ数")
 log_page_open("帳票➃ 常勤日別コマ数")
 
-years = list(range(2025, 2028))
+years = get_available_years()
 months = list(range(1, 13))
 
 col1, col2 = st.columns(2)
 with col1:
-    year = st.selectbox("年", years, index=1)
+    default_year = datetime.now().year if datetime.now().year in years else years[-1]
+    year = st.selectbox("年", years, index=years.index(default_year))
 with col2:
     month = st.selectbox("月", months, index=datetime.now().month - 1)
 

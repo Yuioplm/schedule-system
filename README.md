@@ -76,6 +76,7 @@
 10. **帳票⑤ 常勤・非常勤月別コマ数**（`10_帳票5.py`）
 11. **帳票⑥ 非常勤医師勤務報告書**（`11_帳票6.py`）
 12. **マスタ管理**（`12_マスタ管理.py`）
+   - 各種マスタ編集に加え、**年度管理タブ**から次年度/指定年度範囲の追加が可能
 
 サイドバーには、Windowsサーバー向けに **「💾 バックアップして終了」** ボタンがあります。
 
@@ -136,11 +137,51 @@ python set_up.py
 6. `scripts/fix_date_format.py`
 7. `scripts/migrate.py`
 
-### 5.3 起動
+### 5.3 年度の追加（運用時）
+
+#### 方法A: 設定値を更新して再実行
+
+`scripts/settings.py` の `END_FISCAL_YEAR` を更新し、再実行します。
+
+```bash
+python set_up.py
+```
+
+または対象スクリプトのみ:
+
+```bash
+python scripts/generate_date_master.py
+python scripts/generate_holiday_master.py
+```
+
+#### 方法B: 追加年度だけを生成（推奨）
+
+既存データの最大年度の次年度を1年追加:
+
+```bash
+python scripts/extend_fiscal_year.py
+```
+
+範囲指定で追加（例: 2031〜2033年度）:
+
+```bash
+python scripts/extend_fiscal_year.py --start-fy 2031 --end-fy 2033
+```
+
+> `M_Date` は `INSERT OR IGNORE`、`M_Holiday` は `WHERE NOT EXISTS` で重複追加を回避します。
+
+### 5.4 起動
 
 ```bash
 streamlit run streamlit_app/app.py
 ```
+
+### 5.5 別PCへの導入時の注意（バックアップ復元）
+
+1. 先にバックアップDB（`schedule.db`）を復元する  
+2. その後に必要があれば `scripts/extend_fiscal_year.py` で不足年度のみ追加する  
+
+この順序にすると、復元済み年度とセットアップ既定年度の差異があっても、重複や欠損のリスクを最小化できます。
 
 ---
 

@@ -1,10 +1,11 @@
 import sqlite3
 from datetime import date, timedelta
 import jpholiday
-from settings import DB_PATH
+from settings import DB_PATH, fiscal_year_date_range
 
-start_date = date(2025, 4, 1)
-end_date = date(2031, 3, 31)
+start_date_str, end_date_str = fiscal_year_date_range()
+start_date = date.fromisoformat(start_date_str)
+end_date = date.fromisoformat(end_date_str)
 
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
@@ -19,8 +20,14 @@ while current <= end_date:
 
         cursor.execute("""
         INSERT INTO M_Holiday (HolidayDate, HolidayName)
-        VALUES (?, ?)
-        """, (current.isoformat(), name))
+        SELECT ?, ?
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM M_Holiday
+            WHERE HolidayDate = ?
+              AND HolidayName = ?
+        )
+        """, (current.isoformat(), name, current.isoformat(), name))
 
     # 年末年始
     if (current.month == 12 and current.day in [30, 31]) or \
@@ -28,8 +35,14 @@ while current <= end_date:
 
         cursor.execute("""
         INSERT INTO M_Holiday (HolidayDate, HolidayName)
-        VALUES (?, ?)
-        """, (current.isoformat(), "年末年始"))
+        SELECT ?, ?
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM M_Holiday
+            WHERE HolidayDate = ?
+              AND HolidayName = ?
+        )
+        """, (current.isoformat(), "年末年始", current.isoformat(), "年末年始"))
 
     current += timedelta(days=1)
 
