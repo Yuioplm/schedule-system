@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from time import perf_counter
+import subprocess
+import sys
+from pathlib import Path
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
@@ -227,7 +230,120 @@ def render_master_ui(config: dict):
                 raise
 
 
-master_tabs = st.tabs([cfg["tab"] for cfg in MASTER_CONFIGS])
-for tab, cfg in zip(master_tabs, MASTER_CONFIGS):
+def get_fiscal_year_range() -> tuple[int | None, int | None]:
+    row = conn.execute("""
+        SELECT
+            MIN(
+                CASE
+                    WHEN CAST(strftime('%m', CalendarDate) AS INTEGER) >= 4
+                        THEN CAST(strftime('%Y', CalendarDate) AS INTEGER)
+                    ELSE CAST(strftime('%Y', CalendarDate) AS INTEGER) - 1
+                END
+            ) AS min_fy,
+            MAX(
+                CASE
+                    WHEN CAST(strftime('%m', CalendarDate) AS INTEGER) >= 4
+                        THEN CAST(strftime('%Y', CalendarDate) AS INTEGER)
+                    ELSE CAST(strftime('%Y', CalendarDate) AS INTEGER) - 1
+                END
+            ) AS max_fy
+        FROM M_Date
+    """).fetchone()
+    return row[0], row[1]
+
+
+def run_extend_fiscal_year(start_fy: int | None, end_fy: int | None) -> tuple[int, str, str]:
+    cmd = [sys.executable, str(Path("scripts/extend_fiscal_year.py"))]
+    if start_fy is not None:
+        cmd.extend(["--start-fy", str(start_fy)])
+    if end_fy is not None:
+        cmd.extend(["--end-fy", str(end_fy)])
+
+    completed = subprocess.run(
+        cmd,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def render_fiscal_year_admin_ui():
+    st.subheader("年度管理")
+    min_fy, max_fy = get_fiscal_year_range()
+    if min_fy is None or max_fy is None:
+        st.warning("M_Date が空のため、先に初期セットアップを実行してください。")
+        return
+
+    st.info(f"現在の登録範囲: {min_fy}年度 ～ {max_fy}年度")
+
+    mode = st.radio(
+        "追加方法",
+        options=["次年度を1年追加", "年度範囲を指定して追加"],
+        horizontal=False,
+    )
+
+    with st.form("extend_fiscal_year_form"):
+        if mode == "次年度を1年追加":
+            start_fy = None
+            end_fy = None
+            st.caption(f"次に追加される年度: {max_fy + 1}年度")
+        else:
+            start_fy = st.number_input("開始年度", min_value=2000, max_value=2100, value=max_fy + 1, step=1)
+            end_fy = st.number_input("終了年度", min_value=2000, max_value=2100, value=max_fy + 1, step=1)
+
+        submitted = st.form_submit_button("年度を追加")
+
+        if submitted:
+            request_id = log_event(
+                "update_start",
+                "マスタ管理",
+                operation="extend_fiscal_year",
+                start_fiscal_year=start_fy,
+                end_fiscal_year=end_fy,
+            )
+            started_at = perf_counter()
+            try:
+                return_code, stdout, stderr = run_extend_fiscal_year(start_fy, end_fy)
+                elapsed_ms = int((perf_counter() - started_at) * 1000)
+                if return_code == 0:
+                    log_event(
+                        "update_success",
+                        "マスタ管理",
+                        request_id=request_id,
+                        operation="extend_fiscal_year",
+                        elapsed_ms=elapsed_ms,
+                    )
+                    st.success("年度追加が完了しました。画面を再読込すると最新状態を確認できます。")
+                    if stdout.strip():
+                        st.code(stdout)
+                else:
+                    log_event(
+                        "update_failed",
+                        "マスタ管理",
+                        request_id=request_id,
+                        operation="extend_fiscal_year",
+                        elapsed_ms=elapsed_ms,
+                        error=f"return_code={return_code}",
+                    )
+                    st.error("年度追加に失敗しました。")
+                    if stderr.strip():
+                        st.code(stderr)
+            except Exception as exc:
+                log_event(
+                    "update_failed",
+                    "マスタ管理",
+                    request_id=request_id,
+                    operation="extend_fiscal_year",
+                    error=type(exc).__name__,
+                )
+                raise
+
+
+tabs = st.tabs([cfg["tab"] for cfg in MASTER_CONFIGS] + ["年度管理"])
+for tab, cfg in zip(tabs[:-1], MASTER_CONFIGS):
     with tab:
         render_master_ui(cfg)
+
+with tabs[-1]:
+    render_fiscal_year_admin_ui()
