@@ -3,16 +3,26 @@ import pandas as pd
 from datetime import datetime
 from time import perf_counter
 
-from scripts.settings import get_conn, get_available_years
+from scripts import settings
 from streamlit_app.log_events import log_event, log_page_open
 from streamlit_app.sql_loader import load_sql
 
-conn = get_conn()
+conn = settings.get_conn()
+
+
+def _resolve_available_years():
+    get_years = getattr(settings, "get_available_years", None)
+    if callable(get_years):
+        return get_years()
+
+    start_year = getattr(settings, "START_FISCAL_YEAR", datetime.now().year)
+    end_year = getattr(settings, "END_FISCAL_YEAR", start_year + 5)
+    return list(range(start_year, end_year + 2))
 
 st.title("帳票➃ 常勤日別コマ数")
 log_page_open("帳票➃ 常勤日別コマ数")
 
-years = get_available_years()
+years = _resolve_available_years()
 months = list(range(1, 13))
 
 col1, col2 = st.columns(2)
