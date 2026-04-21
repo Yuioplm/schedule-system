@@ -88,7 +88,6 @@
 
 - `create_tables.sql`（全テーブル・ビュー定義）
 - 帳票SQL
-  - `Report1_intermediate.sql`
   - `Report1_pivot.sql`
   - `Report1_pivot_external.sql`
   - `Report2.sql`
@@ -96,7 +95,6 @@
   - `Report4.sql`
   - `Report5.sql`
   - `Report6_daily_status.sql`
-  - `Report6_doctors.sql`
   - `Report6_eligible_doctors.sql`
 
 ### 4.2 `scripts/`
