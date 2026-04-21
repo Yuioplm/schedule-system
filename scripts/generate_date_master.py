@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from scripts.settings import fiscal_year_date_range
+from settings import fiscal_year_date_range
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
