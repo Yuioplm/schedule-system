@@ -162,3 +162,56 @@ def test_report2_column_and_count_contract(db_conn: sqlite3.Connection) -> None:
 
     _assert_columns(cursor, ["日付", "曜日", "時間", "診療科名", "変更前医師", "変更内容", "備考"])
     assert len(rows) == 1
+
+
+def test_report2_excludes_rpt2flag_off_rows(db_conn: sqlite3.Connection) -> None:
+    _insert_base_slot(db_conn, "2026-04-06", slot_id=1)
+    db_conn.execute(
+        """
+        INSERT INTO T_ScheduleChange (
+            ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail, Reason,
+            NewDoctorID, NewTimeSlotID, ActiveFlag, Rpt2Flag
+        ) VALUES (
+            1, '2026-04-06', 1, 2, '担当変更', '備考',
+            2, 2, 1, 0
+        )
+        """
+    )
+
+    rows = db_conn.execute(_load_sql("Report2.sql"), {"start_date": "2026-04-01"}).fetchall()
+
+    assert rows == []
+
+
+def test_actual_schedule_search_excludes_holiday_base_slot(db_conn: sqlite3.Connection) -> None:
+    _insert_base_slot(db_conn, "2026-04-29", slot_id=1)
+    db_conn.execute("INSERT INTO M_Holiday (HolidayDate, HolidayName) VALUES ('2026-04-29', '祝日')")
+
+    rows = db_conn.execute(
+        _load_sql("ActualScheduleSearch_base.sql"),
+        ("2026-04-01", "2026-04-30"),
+    ).fetchall()
+
+    assert rows == []
+
+
+def test_actual_schedule_search_uses_latest_change_detail(db_conn: sqlite3.Connection) -> None:
+    _insert_base_slot(db_conn, "2026-04-06", slot_id=1)
+    db_conn.execute(
+        """
+        INSERT INTO T_ScheduleChange (
+            ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail, Reason,
+            NewDoctorID, NewTimeSlotID, ActiveFlag, Rpt2Flag
+        ) VALUES
+            (10, '2026-04-06', 1, 2, '古い変更', '備考1', 2, 2, 1, 1),
+            (11, '2026-04-06', 1, 2, '最新変更', '備考2', 1, 1, 1, 1)
+        """
+    )
+
+    row = db_conn.execute(
+        _load_sql("ActualScheduleSearch_base.sql"),
+        ("2026-04-01", "2026-04-30"),
+    ).fetchone()
+
+    assert row is not None
+    assert row[8] == "最新変更"
