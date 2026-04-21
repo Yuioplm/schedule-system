@@ -69,6 +69,13 @@ def _seed_master_data(conn: sqlite3.Connection) -> None:
     )
 
 
+def _new_test_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(_load_sql("create_tables.sql"))
+    _seed_master_data(conn)
+    return conn
+
+
 def test_file_db_init_migrate_and_core_sqls_run(tmp_path: Path) -> None:
     db_path = tmp_path / "schedule.db"
 
@@ -106,5 +113,88 @@ def test_file_db_init_migrate_and_core_sqls_run(tmp_path: Path) -> None:
         assert len(schedule_rows) == 1
         assert len(actual_rows) == 1
         assert len(report2_rows) == 1
+    finally:
+        conn.close()
+
+
+def test_v_schedule_actual_uses_latest_active_change() -> None:
+    conn = _new_test_db()
+    try:
+        _insert_base_slot(conn, "2026-04-06", slot_id=1)
+        conn.execute(
+            """
+            INSERT INTO T_ScheduleChange (
+                ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail,
+                NewDoctorID, NewTimeSlotID, ActiveFlag
+            ) VALUES
+                (1, '2026-04-06', 1, 2, '旧変更', 1, 1, 1),
+                (2, '2026-04-06', 1, 2, '最新変更', 2, 2, 1)
+            """
+        )
+        conn.commit()
+
+        row = conn.execute(
+            """
+            SELECT DoctorID, TimeSlotID, ChangeDetail
+            FROM V_ScheduleActual
+            WHERE CalendarDate = '2026-04-06' AND SlotID = 1
+            """
+        ).fetchone()
+        assert row == (2, 2, "最新変更")
+    finally:
+        conn.close()
+
+
+def test_v_schedule_actual_excludes_cancel_change() -> None:
+    conn = _new_test_db()
+    try:
+        _insert_base_slot(conn, "2026-04-06", slot_id=1)
+        conn.execute(
+            """
+            INSERT INTO T_ScheduleChange (
+                ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail, ActiveFlag
+            ) VALUES (
+                1, '2026-04-06', 1, 1, '取消', 1
+            )
+            """
+        )
+        conn.commit()
+
+        row_count = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM V_ScheduleActual
+            WHERE CalendarDate = '2026-04-06' AND SlotID = 1
+            """
+        ).fetchone()[0]
+        assert row_count == 0
+    finally:
+        conn.close()
+
+
+def test_v_schedule_actual_ignores_inactive_latest_change() -> None:
+    conn = _new_test_db()
+    try:
+        _insert_base_slot(conn, "2026-04-06", slot_id=1)
+        conn.execute(
+            """
+            INSERT INTO T_ScheduleChange (
+                ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail,
+                NewDoctorID, ActiveFlag
+            ) VALUES
+                (1, '2026-04-06', 1, 2, '有効変更', 2, 1),
+                (2, '2026-04-06', 1, 2, '無効変更', 1, 0)
+            """
+        )
+        conn.commit()
+
+        row = conn.execute(
+            """
+            SELECT DoctorID, ChangeDetail
+            FROM V_ScheduleActual
+            WHERE CalendarDate = '2026-04-06' AND SlotID = 1
+            """
+        ).fetchone()
+        assert row == (2, "有効変更")
     finally:
         conn.close()

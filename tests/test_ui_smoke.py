@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -11,7 +10,6 @@ import pytest
 from urllib.request import urlopen
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows運用環境向けスモーク")
 def test_streamlit_top_page_is_reachable() -> None:
     if shutil.which("streamlit") is None:
         pytest.skip("streamlit command is not available in this environment")
