@@ -16,3 +16,11 @@ logs/
 
 # runtime temp files
 .runtime/
+
+# local development / test caches
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
