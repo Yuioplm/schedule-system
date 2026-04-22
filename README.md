@@ -128,7 +128,66 @@
 
 > 前提: Python 3.11 以上推奨
 
-### 5.1 依存インストール
+### 5.0 新規環境への導入手順（配布済み原本をPCへ配置）
+
+開発完了後は、GitHub から `git clone` する運用ではなく、  
+**GitHub上で保持しているディレクトリ構成をコピーした「配布用原本」**をファイルサーバー等で管理し、  
+PCセットアップ時にその一式をサーバーPCへコピーして導入する想定です。  
+以下を「新規環境の標準手順」として利用してください。
+
+1. 配布用原本（フォルダ一式）をサーバーPCへコピーする  
+   （`Schedule-System/` 一式をそのまま配置）
+
+```bash
+cd Schedule-System
+```
+
+2. `csv/` フォルダ配下にマスタCSV一式を配置する  
+   （例: `M_*.csv`, `T_ConsultationSlot.csv`）
+
+3. 初期セットアップを実行する（推奨: 自動化バッチ）
+
+- Windows (cmd.exe)
+
+```bat
+ops\windows\init_setup.bat
+```
+
+> 上記バッチで、以下 4 手順（仮想環境作成 / 仮想環境利用 / 依存インストール / `set_up.py` 実行）を連続実行します。
+
+4. （手動実行する場合）仮想環境を作成する
+
+```bash
+python -m venv venv
+```
+
+5. （手動実行する場合）仮想環境を有効化する
+
+- Windows (PowerShell)
+
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+- Windows (cmd.exe)
+
+```bat
+.\venv\Scripts\activate
+```
+
+6. （手動実行する場合）依存関係をインストールする
+
+```bash
+pip install -r requirements.txt
+```
+
+7. （手動実行する場合）初期セットアップを実行する
+
+```bash
+python set_up.py
+```
+
+### 5.1 依存インストール（個別実行したい場合）
 
 ```bash
 pip install -r requirements.txt
@@ -230,6 +289,7 @@ Schedule-System/
 ├─ sql/
 ├─ ops/
 │  └─ windows/
+│     ├─ init_setup.bat
 │     ├─ start_app.bat
 │     ├─ start_app_silent.vbs
 │     ├─ backup_db.bat
