@@ -177,26 +177,26 @@ python -m venv venv
 
 6. （手動実行する場合）依存関係をインストールする
 
-```bash
-pip install -r requirements.txt
+```bat
+venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 7. （手動実行する場合）初期セットアップを実行する
 
-```bash
-python set_up.py
+```bat
+venv\Scripts\python.exe set_up.py
 ```
 
 ### 5.1 依存インストール（個別実行したい場合）
 
-```bash
-pip install -r requirements.txt
+```bat
+venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ### 5.2 DB・初期データ作成
 
-```bash
-python set_up.py
+```bat
+venv\Scripts\python.exe set_up.py
 ```
 
 `set_up.py` 実行内容:
@@ -215,37 +215,37 @@ python set_up.py
 
 `scripts/settings.py` の `END_FISCAL_YEAR` を更新し、再実行します。
 
-```bash
-python set_up.py
+```bat
+venv\Scripts\python.exe set_up.py
 ```
 
 または対象スクリプトのみ:
 
-```bash
-python scripts/generate_date_master.py
-python scripts/generate_holiday_master.py
+```bat
+venv\Scripts\python.exe scripts/generate_date_master.py
+venv\Scripts\python.exe scripts/generate_holiday_master.py
 ```
 
 #### 方法B: 追加年度だけを生成（推奨）
 
 既存データの最大年度の次年度を1年追加:
 
-```bash
-python scripts/extend_fiscal_year.py
+```bat
+venv\Scripts\python.exe scripts/extend_fiscal_year.py
 ```
 
 範囲指定で追加（例: 2031〜2033年度）:
 
-```bash
-python scripts/extend_fiscal_year.py --start-fy 2031 --end-fy 2033
+```bat
+venv\Scripts\python.exe scripts/extend_fiscal_year.py --start-fy 2031 --end-fy 2033
 ```
 
 > `M_Date` は `INSERT OR IGNORE`、`M_Holiday` は `WHERE NOT EXISTS` で重複追加を回避します。
 
 ### 5.4 起動
 
-```bash
-streamlit run streamlit_app/app.py
+```bat
+venv\Scripts\python.exe -m streamlit run streamlit_app/app.py
 ```
 
 ### 5.5 別PCへの導入時の注意（バックアップ復元）
