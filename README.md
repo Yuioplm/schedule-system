@@ -56,6 +56,218 @@
 - `V_ScheduleActual`
   - 通常枠 + 最新変更（取消除外） + 臨時外来 を統合（反映後予定・帳票向け）
 
+### 2.4 テーブル/ビュー カラム説明（現行DB定義ベース）
+
+> 参照元: `sql/create_tables.sql`  
+> `ID` は主キー、`ActiveFlag` は `1=有効 / 0=無効` 運用を想定。
+
+#### M_ClinicalDepartment（診療科マスタ）
+
+| カラム | 説明 |
+|---|---|
+| ClinDeptID | 診療科ID（主キー） |
+| Category | 診療科カテゴリ |
+| ClinDeptName | 診療科名 |
+| Rpt1Sort | 帳票①での表示順 |
+| Rpt1Flag | 帳票①の対象フラグ |
+| Rpt2Flag | 帳票②の対象フラグ |
+| Rpt3Flag | 帳票③の対象フラグ |
+| Rpt4Flag | 帳票④の対象フラグ |
+| Rpt5Flag | 帳票⑤の対象フラグ |
+| Rpt6Flag | 帳票⑥の対象フラグ |
+| ActiveFlag | 有効フラグ |
+
+#### M_Specialty（専門マスタ）
+
+| カラム | 説明 |
+|---|---|
+| SpecialtyID | 専門ID（主キー） |
+| SpecialtyName | 専門名 |
+| ActiveFlag | 有効フラグ |
+
+#### M_ReportClinicalDepartment（帳票用診療科マスタ）
+
+| カラム | 説明 |
+|---|---|
+| RptClinDeptID | 帳票用診療科ID（主キー） |
+| RptClinDeptName | 帳票用診療科名 |
+| ActiveFlag | 有効フラグ |
+
+#### M_Doctor（医師マスタ）
+
+| カラム | 説明 |
+|---|---|
+| DoctorID | 医師ID（主キー） |
+| DoctorName | 医師名 |
+| Department | 所属 |
+| EmploymentType | 勤務形態（常勤/非常勤など） |
+| ActiveFlag | 有効フラグ |
+
+#### M_TimeSlot（時間帯マスタ）
+
+| カラム | 説明 |
+|---|---|
+| TimeSlotID | 時間帯ID（主キー） |
+| TimeSlotName | 時間帯名（午前/午後など） |
+
+#### M_Date（日付マスタ）
+
+| カラム | 説明 |
+|---|---|
+| DateID | 日付ID（主キー） |
+| CalendarDate | カレンダー日付（YYYY-MM-DD） |
+| DayOfWeek | 曜日番号（0-6） |
+| WeekNumber | 月内週番号（1-5想定） |
+| YearMonth | 年月（YYYY-MM） |
+
+#### M_Holiday（祝日マスタ）
+
+| カラム | 説明 |
+|---|---|
+| HolidayID | 祝日ID（主キー） |
+| HolidayDate | 祝日の日付 |
+| HolidayName | 祝日名 |
+
+#### M_ScheduleChangeType（予定変更区分マスタ）
+
+| カラム | 説明 |
+|---|---|
+| ChangeTypeID | 変更区分ID（主キー） |
+| ChangeTypeName | 変更区分名（休診/代診など） |
+| IsCancel | 取消区分（1=取消） |
+| ActiveFlag | 有効フラグ |
+
+#### T_ConsultationSlot（通常枠テンプレート）
+
+| カラム | 説明 |
+|---|---|
+| SlotID | 枠ID（主キー） |
+| Rpt1ClinDeptID | 帳票①用の診療科ID |
+| Rpt1SpecialtyID | 帳票①用の専門ID |
+| Rpt1DisplayDoctorName | 帳票①表示用の医師名（文字列） |
+| Rpt2ClinDeptID | 帳票②用の診療科ID |
+| Rpt3ClinDeptID | 帳票③用の診療科ID |
+| Rpt4ClinDeptID | 帳票④用の診療科ID |
+| Rpt5ClinDeptID | 帳票⑤用の診療科ID |
+| Rpt6ClinDeptID | 帳票⑥用の診療科ID |
+| DoctorID | 担当医師ID |
+| TimeSlotID | 時間帯ID |
+| Room | 診察室/部屋 |
+| DayOfWeek | 適用曜日（`M_Date.DayOfWeek` と一致） |
+| WeekPattern | 適用週パターン（例: `135` = 第1/3/5週） |
+| StartDate | 有効開始日 |
+| EndDate | 有効終了日 |
+| ActiveFlag | 有効フラグ |
+
+#### T_ScheduleChange（通常枠変更トランザクション）
+
+| カラム | 説明 |
+|---|---|
+| ChangeID | 変更ID（主キー） |
+| CalendarDate | 変更対象日 |
+| SlotID | 変更対象の枠ID |
+| ChangeTypeID | 変更区分ID |
+| ChangeDetail | 変更内容メモ |
+| NewDoctorID | 変更後医師ID |
+| NewTimeSlotID | 変更後時間帯ID |
+| NewRoom | 変更後部屋 |
+| Reason | 変更理由 |
+| ChangeAcceptedDate | 承認日 |
+| ChangedBy | 変更者 |
+| Rpt2Flag | 帳票②出力対象フラグ |
+| ActiveFlag | 有効フラグ |
+| CreatedAt | 作成日時 |
+
+#### T_TemporarySchedule（臨時外来トランザクション）
+
+| カラム | 説明 |
+|---|---|
+| TempID | 臨時外来ID（主キー） |
+| CalendarDate | 実施日 |
+| TimeSlotID | 時間帯ID |
+| Rpt1ClinDeptID | 帳票①用の診療科ID |
+| Rpt1SpecialtyID | 帳票①用の専門ID |
+| Rpt1DisplayDoctorName | 帳票①表示用の医師名（文字列） |
+| Rpt2ClinDeptID | 帳票②用の診療科ID |
+| Rpt3ClinDeptID | 帳票③用の診療科ID |
+| Rpt4ClinDeptID | 帳票④用の診療科ID |
+| Rpt5ClinDeptID | 帳票⑤用の診療科ID |
+| Rpt6ClinDeptID | 帳票⑥用の診療科ID |
+| DoctorID | 担当医師ID |
+| Room | 診察室/部屋 |
+| ChangeDetail | 備考/変更内容 |
+| Reason | 理由 |
+| ActiveFlag | 有効フラグ |
+| Rpt2Flag | 帳票②出力対象フラグ |
+| CreatedAt | 作成日時 |
+
+#### T_ChangeNoticeOutputHistory（変更届出力履歴）
+
+| カラム | 説明 |
+|---|---|
+| OutputHistoryID | 出力履歴ID（主キー） |
+| TargetType | 出力対象種別（ScheduleChange / TemporarySchedule） |
+| TargetID | 出力対象のID（ChangeID / TempID） |
+| OutputBy | 出力実行者 |
+| OutputDate | 出力日時 |
+
+#### V_ScheduleBase（通常枠展開ビュー）
+
+| カラム | 説明 |
+|---|---|
+| CalendarDate | 展開後の日付 |
+| DayOfWeek | 曜日番号 |
+| WeekNumber | 月内週番号 |
+| SlotID | 元テンプレートの枠ID |
+| Rpt1ClinDeptID | 帳票①用診療科ID |
+| Rpt1SpecialtyID | 帳票①用専門ID |
+| Rpt1DisplayDoctorName | 帳票①表示用医師名 |
+| Rpt2ClinDeptID | 帳票②用診療科ID |
+| Rpt3ClinDeptID | 帳票③用診療科ID |
+| Rpt4ClinDeptID | 帳票④用診療科ID |
+| Rpt5ClinDeptID | 帳票⑤用診療科ID |
+| Rpt6ClinDeptID | 帳票⑥用診療科ID |
+| DoctorID | 担当医師ID |
+| TimeSlotID | 時間帯ID |
+| Room | 診察室/部屋 |
+
+#### V_ScheduleFull（予定確認ビュー）
+
+| カラム | 説明 |
+|---|---|
+| CalendarDate | 日付 |
+| DayOfWeekNumber | 曜日番号（`strftime('%w')`） |
+| DayOfWeek | 曜日表示（`月` など） |
+| ClinDeptName | 診療科名 |
+| SpecialtyName | 専門名 |
+| TimeSlotName | 時間帯名 |
+| Room | 診察室/部屋 |
+| DoctorID | 医師ID |
+| DoctorName | 医師名 |
+| DisplayDoctorName | 帳票①表示用医師名 |
+| SlotID | 元枠ID |
+
+#### V_ScheduleActual（反映後予定ビュー）
+
+| カラム | 説明 |
+|---|---|
+| CalendarDate | 日付 |
+| SlotID | 元枠ID（臨時外来は `NULL`） |
+| Rpt1ClinDeptID | 帳票①用診療科ID |
+| Rpt1SpecialtyID | 帳票①用専門ID |
+| Rpt1DisplayDoctorName | 帳票①表示用医師名 |
+| Rpt2ClinDeptID | 帳票②用診療科ID |
+| Rpt3ClinDeptID | 帳票③用診療科ID |
+| Rpt4ClinDeptID | 帳票④用診療科ID |
+| Rpt5ClinDeptID | 帳票⑤用診療科ID |
+| Rpt6ClinDeptID | 帳票⑥用診療科ID |
+| DoctorID | 最終採用医師ID（変更後優先） |
+| TimeSlotID | 最終採用時間帯ID（変更後優先） |
+| Room | 最終採用部屋（変更後優先） |
+| ChangeTypeID | 変更区分ID（臨時外来は `NULL`） |
+| ChangeDetail | 変更内容/備考 |
+| Reason | 変更理由 |
+
 ---
 
 ## 3. 画面構成（`streamlit_app/pages`）
