@@ -21,6 +21,44 @@ DAY_OPTIONS = [
 ]
 DB_OPEN_END_DATE = date(9999, 12, 31)
 STREAMLIT_MAX_DATE = date(2099, 12, 31)
+PREVIEW_COLUMN_LABELS = {
+    "SlotID": "SlotID",
+    "DoctorName": "医師",
+    "DayOfWeek": "曜日",
+    "WeekPattern": "WeekPattern",
+    "TimeSlotName": "時間帯",
+    "Room": "診察室",
+    "ClinDeptName": "診療科",
+    "SpecialtyName": "専門外来名",
+    "Rpt1DisplayDoctorName": "帳票①表示名（任意）",
+    "Rpt2ClinDeptName": "帳票②用診療科名",
+    "Rpt3ClinDeptName": "帳票③用診療科名",
+    "Rpt4ClinDeptName": "帳票④用診療科名",
+    "Rpt5ClinDeptName": "帳票⑤用診療科名",
+    "Rpt6ClinDeptName": "帳票⑥用診療科名",
+    "StartDate": "開始日",
+    "EndDate": "終了日",
+    "ActiveFlag": "有効",
+}
+PREVIEW_FORM_COLUMNS = [
+    "SlotID",
+    "DoctorName",
+    "DayOfWeek",
+    "WeekPattern",
+    "TimeSlotName",
+    "Room",
+    "ClinDeptName",
+    "SpecialtyName",
+    "Rpt1DisplayDoctorName",
+    "Rpt2ClinDeptName",
+    "Rpt3ClinDeptName",
+    "Rpt4ClinDeptName",
+    "Rpt5ClinDeptName",
+    "Rpt6ClinDeptName",
+    "StartDate",
+    "EndDate",
+    "ActiveFlag",
+]
 
 
 def _day_label(day_num: int) -> str:
@@ -133,8 +171,9 @@ if day_filter != "(全て)":
     day_num = next((v for v, l in DAY_OPTIONS if l == day_filter), None)
     view_df = view_df[view_df["DayOfWeek"] == day_num]
 
-show_df = view_df.copy()
+show_df = view_df[PREVIEW_FORM_COLUMNS].copy()
 show_df["DayOfWeek"] = show_df["DayOfWeek"].apply(_day_label)
+show_df = show_df.rename(columns=PREVIEW_COLUMN_LABELS)
 st.dataframe(show_df, use_container_width=True)
 
 if view_df.empty:
@@ -146,13 +185,6 @@ else:
 
     st.caption("選択した枠を編集できます（終了日だけ修正したい場合も可）。")
     with st.form("edit_slot_form"):
-        dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
-        edit_dept_id = st.selectbox(
-            "診療科",
-            dept_options,
-            index=_safe_option_index(dept_options, None if pd.isna(selected_row["Rpt1ClinDeptID"]) else int(selected_row["Rpt1ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
-        )
         doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
         edit_doctor_id = st.selectbox(
             "医師",
@@ -160,53 +192,6 @@ else:
             index=_safe_option_index(doctor_options, None if pd.isna(selected_row["DoctorID"]) else int(selected_row["DoctorID"])),
             format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
         )
-        timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
-        edit_timeslot_id = st.selectbox(
-            "時間帯",
-            timeslot_options,
-            index=_safe_option_index(timeslot_options, None if pd.isna(selected_row["TimeSlotID"]) else int(selected_row["TimeSlotID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
-        )
-        specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
-        edit_specialty_id = st.selectbox(
-            "専門外来名（Rpt1SpecialtyID）",
-            specialty_options,
-            index=_safe_option_index(specialty_options, None if pd.isna(selected_row["Rpt1SpecialtyID"]) else int(selected_row["Rpt1SpecialtyID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_specialty.loc[master_specialty['SpecialtyID'] == x, 'SpecialtyName'].iloc[0]}",
-        )
-        rpt_dept_options = [None] + master_report_dept["RptClinDeptID"].astype(int).tolist()
-        edit_rpt2_dept_id = st.selectbox(
-            "帳票➁用診療科名（Rpt2ClinDeptID）",
-            rpt_dept_options,
-            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt2ClinDeptID"]) else int(selected_row["Rpt2ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-        )
-        edit_rpt3_dept_id = st.selectbox(
-            "帳票➂用診療科名（Rpt3ClinDeptID）",
-            rpt_dept_options,
-            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt3ClinDeptID"]) else int(selected_row["Rpt3ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-        )
-        edit_rpt4_dept_id = st.selectbox(
-            "帳票➃用診療科名（Rpt4ClinDeptID）",
-            rpt_dept_options,
-            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt4ClinDeptID"]) else int(selected_row["Rpt4ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-        )
-        edit_rpt5_dept_id = st.selectbox(
-            "帳票➄用診療科名（Rpt5ClinDeptID）",
-            rpt_dept_options,
-            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt5ClinDeptID"]) else int(selected_row["Rpt5ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-        )
-        edit_rpt6_dept_id = st.selectbox(
-            "帳票⑥用診療科名（Rpt6ClinDeptID）",
-            rpt_dept_options,
-            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt6ClinDeptID"]) else int(selected_row["Rpt6ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-        )
-
-        edit_room = st.text_input("診察室", value="" if pd.isna(selected_row["Room"]) else str(selected_row["Room"]))
         edit_day = st.selectbox(
             "曜日",
             [None] + [v for v, _ in DAY_OPTIONS],
@@ -215,6 +200,63 @@ else:
         )
         edit_weekpattern = st.text_input(
             "WeekPattern", value="" if pd.isna(selected_row["WeekPattern"]) else str(selected_row["WeekPattern"])
+        )
+        timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
+        edit_timeslot_id = st.selectbox(
+            "時間帯",
+            timeslot_options,
+            index=_safe_option_index(timeslot_options, None if pd.isna(selected_row["TimeSlotID"]) else int(selected_row["TimeSlotID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
+        )
+        edit_room = st.text_input("診察室", value="" if pd.isna(selected_row["Room"]) else str(selected_row["Room"]))
+        dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
+        edit_dept_id = st.selectbox(
+            "診療科",
+            dept_options,
+            index=_safe_option_index(dept_options, None if pd.isna(selected_row["Rpt1ClinDeptID"]) else int(selected_row["Rpt1ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+        )
+        specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
+        edit_specialty_id = st.selectbox(
+            "専門外来名",
+            specialty_options,
+            index=_safe_option_index(specialty_options, None if pd.isna(selected_row["Rpt1SpecialtyID"]) else int(selected_row["Rpt1SpecialtyID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_specialty.loc[master_specialty['SpecialtyID'] == x, 'SpecialtyName'].iloc[0]}",
+        )
+        edit_display_name = st.text_input(
+            "帳票①表示名（任意）",
+            value="" if pd.isna(selected_row["Rpt1DisplayDoctorName"]) else str(selected_row["Rpt1DisplayDoctorName"]),
+        )
+        rpt_dept_options = [None] + master_report_dept["RptClinDeptID"].astype(int).tolist()
+        edit_rpt2_dept_id = st.selectbox(
+            "帳票②用診療科名",
+            rpt_dept_options,
+            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt2ClinDeptID"]) else int(selected_row["Rpt2ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+        )
+        edit_rpt3_dept_id = st.selectbox(
+            "帳票③用診療科名",
+            rpt_dept_options,
+            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt3ClinDeptID"]) else int(selected_row["Rpt3ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+        )
+        edit_rpt4_dept_id = st.selectbox(
+            "帳票④用診療科名",
+            rpt_dept_options,
+            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt4ClinDeptID"]) else int(selected_row["Rpt4ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+        )
+        edit_rpt5_dept_id = st.selectbox(
+            "帳票⑤用診療科名",
+            rpt_dept_options,
+            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt5ClinDeptID"]) else int(selected_row["Rpt5ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+        )
+        edit_rpt6_dept_id = st.selectbox(
+            "帳票⑥用診療科名",
+            rpt_dept_options,
+            index=_safe_option_index(rpt_dept_options, None if pd.isna(selected_row["Rpt6ClinDeptID"]) else int(selected_row["Rpt6ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
         )
 
         edit_start_value = _safe_date_for_widget(_safe_date_value(selected_row["StartDate"], fallback=date.today()))
@@ -237,10 +279,6 @@ else:
         )
         if edit_open_end:
             st.caption("※ チェック時は入力値に関わらず 9999-12-31 で保存されます。")
-        edit_display_name = st.text_input(
-            "帳票①表示名（任意）",
-            value="" if pd.isna(selected_row["Rpt1DisplayDoctorName"]) else str(selected_row["Rpt1DisplayDoctorName"]),
-        )
 
         edit_active = st.checkbox("有効", value=int(selected_row["ActiveFlag"]) == 1)
         submitted_update = st.form_submit_button("更新")
@@ -333,14 +371,6 @@ with st.form("create_slot_form"):
     default_doctor = int(default_row["DoctorID"]) if default_row is not None and not pd.isna(default_row["DoctorID"]) else None
     default_timeslot = int(default_row["TimeSlotID"]) if default_row is not None and not pd.isna(default_row["TimeSlotID"]) else None
 
-    new_dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
-    new_dept_id = st.selectbox(
-        "診療科",
-        new_dept_options,
-        index=_safe_option_index(new_dept_options, default_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
-    )
-
     new_doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
     new_doctor_id = st.selectbox(
         "医師",
@@ -348,53 +378,6 @@ with st.form("create_slot_form"):
         index=_safe_option_index(new_doctor_options, default_doctor),
         format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
     )
-    new_timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
-    new_timeslot_id = st.selectbox(
-        "時間帯",
-        new_timeslot_options,
-        index=_safe_option_index(new_timeslot_options, default_timeslot),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
-    )
-    new_specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
-    new_specialty_id = st.selectbox(
-        "専門外来名（Rpt1SpecialtyID）",
-        new_specialty_options,
-        index=_safe_option_index(new_specialty_options, default_specialty),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_specialty.loc[master_specialty['SpecialtyID'] == x, 'SpecialtyName'].iloc[0]}",
-    )
-    new_rpt_dept_options = [None] + master_report_dept["RptClinDeptID"].astype(int).tolist()
-    new_rpt2_dept_id = st.selectbox(
-        "帳票➁用診療科名（Rpt2ClinDeptID）",
-        new_rpt_dept_options,
-        index=_safe_option_index(new_rpt_dept_options, default_rpt2_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-    )
-    new_rpt3_dept_id = st.selectbox(
-        "帳票➂用診療科名（Rpt3ClinDeptID）",
-        new_rpt_dept_options,
-        index=_safe_option_index(new_rpt_dept_options, default_rpt3_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-    )
-    new_rpt4_dept_id = st.selectbox(
-        "帳票➃用診療科名（Rpt4ClinDeptID）",
-        new_rpt_dept_options,
-        index=_safe_option_index(new_rpt_dept_options, default_rpt4_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-    )
-    new_rpt5_dept_id = st.selectbox(
-        "帳票➄用診療科名（Rpt5ClinDeptID）",
-        new_rpt_dept_options,
-        index=_safe_option_index(new_rpt_dept_options, default_rpt5_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-    )
-    new_rpt6_dept_id = st.selectbox(
-        "帳票⑥用診療科名（Rpt6ClinDeptID）",
-        new_rpt_dept_options,
-        index=_safe_option_index(new_rpt_dept_options, default_rpt6_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
-    )
-
-    new_room = st.text_input("診察室", value="" if default_row is None or pd.isna(default_row["Room"]) else str(default_row["Room"]))
     new_day = st.selectbox(
         "曜日",
         [None] + [v for v, _ in DAY_OPTIONS],
@@ -408,6 +391,63 @@ with st.form("create_slot_form"):
     new_weekpattern = st.text_input(
         "WeekPattern",
         value="12345" if default_row is None or pd.isna(default_row["WeekPattern"]) or str(default_row["WeekPattern"]).strip() == "" else str(default_row["WeekPattern"]),
+    )
+    new_timeslot_options = [None] + master_timeslot["TimeSlotID"].astype(int).tolist()
+    new_timeslot_id = st.selectbox(
+        "時間帯",
+        new_timeslot_options,
+        index=_safe_option_index(new_timeslot_options, default_timeslot),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
+    )
+    new_room = st.text_input("診察室", value="" if default_row is None or pd.isna(default_row["Room"]) else str(default_row["Room"]))
+    new_dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
+    new_dept_id = st.selectbox(
+        "診療科",
+        new_dept_options,
+        index=_safe_option_index(new_dept_options, default_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+    )
+    new_specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
+    new_specialty_id = st.selectbox(
+        "専門外来名",
+        new_specialty_options,
+        index=_safe_option_index(new_specialty_options, default_specialty),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_specialty.loc[master_specialty['SpecialtyID'] == x, 'SpecialtyName'].iloc[0]}",
+    )
+    new_display_name = st.text_input(
+        "帳票①表示名（任意）",
+        value="" if default_row is None or pd.isna(default_row["Rpt1DisplayDoctorName"]) else str(default_row["Rpt1DisplayDoctorName"]),
+    )
+    new_rpt_dept_options = [None] + master_report_dept["RptClinDeptID"].astype(int).tolist()
+    new_rpt2_dept_id = st.selectbox(
+        "帳票②用診療科名",
+        new_rpt_dept_options,
+        index=_safe_option_index(new_rpt_dept_options, default_rpt2_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+    )
+    new_rpt3_dept_id = st.selectbox(
+        "帳票③用診療科名",
+        new_rpt_dept_options,
+        index=_safe_option_index(new_rpt_dept_options, default_rpt3_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+    )
+    new_rpt4_dept_id = st.selectbox(
+        "帳票④用診療科名",
+        new_rpt_dept_options,
+        index=_safe_option_index(new_rpt_dept_options, default_rpt4_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+    )
+    new_rpt5_dept_id = st.selectbox(
+        "帳票⑤用診療科名",
+        new_rpt_dept_options,
+        index=_safe_option_index(new_rpt_dept_options, default_rpt5_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
+    )
+    new_rpt6_dept_id = st.selectbox(
+        "帳票⑥用診療科名",
+        new_rpt_dept_options,
+        index=_safe_option_index(new_rpt_dept_options, default_rpt6_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_report_dept.loc[master_report_dept['RptClinDeptID'] == x, 'RptClinDeptName'].iloc[0]}",
     )
     new_start_value = _safe_date_for_widget(_safe_date_value(default_row["StartDate"], fallback=date.today())) if default_row is not None else date.today()
     new_start = st.date_input(
@@ -431,9 +471,9 @@ with st.form("create_slot_form"):
     )
     if new_open_end:
         st.caption("※ チェック時は入力値に関わらず 9999-12-31 で保存されます。")
-    new_display_name = st.text_input(
-        "帳票①表示名（任意）",
-        value="" if default_row is None or pd.isna(default_row["Rpt1DisplayDoctorName"]) else str(default_row["Rpt1DisplayDoctorName"]),
+    new_active = st.checkbox(
+        "有効",
+        value=True if default_row is None or pd.isna(default_row["ActiveFlag"]) else int(default_row["ActiveFlag"]) == 1,
     )
 
     submitted_create = st.form_submit_button("新規登録")
@@ -463,9 +503,10 @@ with st.form("create_slot_form"):
                     WeekPattern,
                     StartDate,
                     EndDate,
-                    Rpt1DisplayDoctorName
+                    Rpt1DisplayDoctorName,
+                    ActiveFlag
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     new_dept_id if new_dept_id is None else int(new_dept_id),
@@ -483,6 +524,7 @@ with st.form("create_slot_form"):
                     str(new_start),
                     "9999-12-31" if new_open_end else str(new_end),
                     new_display_name if new_display_name != "" else None,
+                    1 if new_active else 0,
                 ),
             )
             conn.commit()

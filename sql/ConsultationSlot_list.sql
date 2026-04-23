@@ -4,6 +4,7 @@ SELECT
     cd.ClinDeptName,
     cs.Rpt1SpecialtyID,
     sp.SpecialtyName,
+    cs.Rpt1DisplayDoctorName,
     cs.Rpt2ClinDeptID,
     rcd2.RptClinDeptName AS Rpt2ClinDeptName,
     cs.Rpt3ClinDeptID,
@@ -23,7 +24,6 @@ SELECT
     cs.WeekPattern,
     cs.StartDate,
     cs.EndDate,
-    cs.Rpt1DisplayDoctorName,
     cs.ActiveFlag
 FROM T_ConsultationSlot cs
 LEFT JOIN M_ClinicalDepartment cd ON cd.ClinDeptID = cs.Rpt1ClinDeptID
