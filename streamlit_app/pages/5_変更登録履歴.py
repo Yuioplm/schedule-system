@@ -178,6 +178,24 @@ conn = get_conn()
 
 st.caption("予定変更入力・臨時外来登録の入力内容を、非表示設定を含めて確認できます。")
 
+COLUMN_LABEL_RENAMES = {
+    "SlotID": "枠ID",
+    "WeekPattern": "週番号",
+    "診療科": "診療科名",
+    "専門外来名": "帳票①用専門外来名",
+    "帳票①表示名（任意）": "帳票①用医師表示名",
+    "レコードID": "登録ID",
+    "医師": "変更後医師名",
+    "部屋": "変更後部屋",
+    "帳票➁変更前": "変更前医師表示名",
+    "変更種別": "変更種別名",
+    "医師ID": "変更後医師ID",
+    "時間帯ID": "臨時外来時間帯ID",
+    "診療科ID": "臨時外来診療科ID",
+    "EmploymentType": "勤務形態",
+    "DoctorName": "医師名",
+}
+
 col1, col2 = st.columns(2)
 with col1:
     date_from = st.date_input("開始日")
@@ -241,7 +259,35 @@ if result_df.empty:
     st.info("該当データがありません")
 else:
     display_columns = [col for col in result_df.columns if col != "編集日付"]
-    display_result_df = result_df[display_columns].copy()
+    display_result_df = result_df[display_columns].copy().rename(columns=COLUMN_LABEL_RENAMES)
+
+    preferred_order = [
+        "登録種別",
+        "登録ID",
+        "日付",
+        "曜日",
+        "枠ID",
+        "時間帯",
+        "診療科名",
+        "変更前医師表示名",
+        "変更種別ID",
+        "変更種別名",
+        "変更後部屋",
+        "変更後医師ID",
+        "変更後医師名",
+        "変更内容",
+        "備考",
+        "臨時外来時間帯ID",
+        "臨時外来診療科ID",
+        "帳票②表示",
+        "ActiveFlag",
+        "登録者",
+        "登録日時",
+        "変更届出力者",
+        "変更届出力日",
+    ]
+    remaining_cols = [col for col in display_result_df.columns if col not in preferred_order]
+    display_result_df = display_result_df[[col for col in preferred_order if col in display_result_df.columns] + remaining_cols]
     st.dataframe(display_result_df, use_container_width=True)
     csv = display_result_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
@@ -310,7 +356,7 @@ else:
             if pd.notna(current_change_type) and int(current_change_type) in change_type_options:
                 change_type_index = change_type_options.index(int(current_change_type))
             edit_change_type_id = st.selectbox(
-                "変更種別",
+                "変更種別名",
                 change_type_options,
                 index=change_type_index,
                 format_func=lambda x: f"{x}: {change_type_df.loc[change_type_df['ChangeTypeID'] == x, 'ChangeTypeName'].iloc[0]}",
@@ -337,7 +383,7 @@ else:
             if current_timeslot in timeslot_options:
                 timeslot_index = timeslot_options.index(current_timeslot)
             edit_timeslot_id = st.selectbox(
-                "時間帯",
+                "臨時外来時間帯ID",
                 timeslot_options,
                 index=timeslot_index,
                 format_func=lambda x: f"{x}: {timeslot_df.loc[timeslot_df['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
@@ -349,7 +395,7 @@ else:
             if current_dept in dept_options:
                 dept_index = dept_options.index(current_dept)
             edit_dept_id = st.selectbox(
-                "診療科",
+                "臨時外来診療科ID",
                 dept_options,
                 index=dept_index,
                 format_func=lambda x: f"{x}: {clin_dept_df.loc[clin_dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
@@ -361,14 +407,14 @@ else:
             if pd.notna(current_doctor) and int(current_doctor) in doctor_options:
                 doctor_index = doctor_options.index(int(current_doctor))
             edit_doctor_id = st.selectbox(
-                "担当医（任意）",
+                "変更後医師名（任意）",
                 doctor_options,
                 index=doctor_index,
                 format_func=lambda x: "未設定" if x is None else f"{x}: {doctor_df.loc[doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
             )
 
-            edit_room = st.text_input("診察室", value=selected_row["部屋"] or "")
-            edit_rpt2_before_doctor = st.text_input("帳票➁変更前（任意）", value=selected_row["帳票➁変更前"] or "")
+            edit_room = st.text_input("変更後部屋", value=selected_row["部屋"] or "")
+            edit_rpt2_before_doctor = st.text_input("変更前医師表示名（任意）", value=selected_row["帳票➁変更前"] or "")
 
         edit_detail = st.text_area("変更内容", value=selected_row["変更内容"] or "")
         edit_reason = st.text_area("備考", value=selected_row["備考"] or "")
@@ -476,17 +522,17 @@ else:
     with st.expander("絞り込み条件", expanded=True):
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
-            filter_dept = st.text_input("診療科で検索", value="")
+            filter_dept = st.text_input("診療科名で検索", value="")
         with filter_col2:
-            filter_doctor = st.text_input("医師名で検索", value="")
+            filter_doctor = st.text_input("変更後医師名で検索", value="")
         with filter_col3:
             filter_keyword = st.text_input("変更内容/備考で検索", value="")
 
     filtered_df = display_result_df.copy()
     if filter_dept:
-        filtered_df = filtered_df[filtered_df["診療科"].fillna("").str.contains(filter_dept, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df["診療科名"].fillna("").str.contains(filter_dept, case=False, na=False)]
     if filter_doctor:
-        filtered_df = filtered_df[filtered_df["医師"].fillna("").str.contains(filter_doctor, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df["変更後医師名"].fillna("").str.contains(filter_doctor, case=False, na=False)]
     if filter_keyword:
         keyword_mask = (
             filtered_df["変更内容"].fillna("").str.contains(filter_keyword, case=False, na=False)
