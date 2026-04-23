@@ -12,6 +12,18 @@ conn = get_conn()
 
 st.caption("V_ScheduleActual をもとに、予定変更・臨時外来を反映済みの一覧を検索します。")
 
+COLUMN_LABEL_RENAMES = {
+    "SlotID": "枠ID",
+    "DoctorName": "医師名",
+    "医師": "医師名",
+    "WeekPattern": "週番号",
+    "診療科": "診療科名",
+    "専門": "帳票①用専門外来名",
+    "専門外来名": "帳票①用専門外来名",
+    "帳票表示名": "帳票①用医師表示名",
+    "帳票①表示名（任意）": "帳票①用医師表示名",
+}
+
 # 候補データ
 dept_df = pd.read_sql(
     """
@@ -52,14 +64,14 @@ col3, col4, col5 = st.columns(3)
 with col3:
     dept_options = [None] + dept_df["ClinDeptID"].astype(int).tolist()
     selected_dept = st.selectbox(
-        "診療科",
+        "診療科名",
         dept_options,
         format_func=lambda x: "(全て)" if x is None else f"{x}: {dept_df.loc[dept_df['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
     )
 with col4:
     doctor_options = [None] + doctor_df["DoctorID"].astype(int).tolist()
     selected_doctor = st.selectbox(
-        "医師",
+        "医師名",
         doctor_options,
         format_func=lambda x: "(全て)" if x is None else f"{x}: {doctor_df.loc[doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
     )
@@ -120,8 +132,9 @@ st.subheader("検索結果")
 if result_df.empty:
     st.info("該当データがありません")
 else:
-    st.dataframe(result_df, use_container_width=True)
-    csv = result_df.to_csv(index=False).encode("utf-8-sig")
+    display_df = result_df.rename(columns=COLUMN_LABEL_RENAMES)
+    st.dataframe(display_df, use_container_width=True)
+    csv = display_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         label="CSVダウンロード",
         data=csv,
