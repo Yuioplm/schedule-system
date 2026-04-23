@@ -156,8 +156,11 @@ def replace_cell_value_with_inline_string(sheet_xml: str, cell_ref: str, text: s
 def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_date: str) -> None:
     if target_df.empty:
         return
+    target_id_col = "レコードID" if "レコードID" in target_df.columns else "登録ID"
+    if target_id_col not in target_df.columns:
+        raise KeyError("レコードID / 登録ID の列が見つかりません。")
     rows = [
-        (row["登録種別"], int(row["レコードID"]), output_by if output_by else None, output_date)
+        (row["登録種別"], int(row[target_id_col]), output_by if output_by else None, output_date)
         for _, row in target_df.iterrows()
     ]
     conn.executemany(
@@ -612,7 +615,6 @@ else:
                             output_by=export_user,
                             output_date=str(export_date),
                         )
-                        st.success("変更届出力履歴を登録しました。")
-                        st.rerun()
+                        st.success("変更届出力履歴を登録しました。続けて別条件でも出力できます。")
                 except Exception as exc:
                     st.error(f"テンプレートExcelへの反映に失敗しました: {exc}")
