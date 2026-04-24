@@ -5,7 +5,7 @@
 
 ---
 
-## 1. システム概要（現行設計）
+## 1. システム概要
 
 - 通常枠テンプレート `T_ConsultationSlot` と日付マスタ `M_Date` から、ベース予定 `V_ScheduleBase` を生成
 - 予定確認用に `V_ScheduleFull`（診療科/専門/医師/時間帯名を付加）を利用
@@ -56,7 +56,7 @@
 - `V_ScheduleActual`
   - 通常枠 + 最新変更（取消除外） + 臨時外来 を統合（反映後予定・帳票向け）
 
-### 2.4 テーブル/ビュー カラム説明（現行DB定義ベース）
+### 2.4 テーブル/ビュー カラム説明
 > 参照元: `sql/create_tables.sql`  
 > `ID` は主キー、`ActiveFlag` は `1=有効 / 0=無効` 運用を想定。
 
@@ -404,7 +404,7 @@ venv\Scripts\python.exe set_up.py
 venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 5.2 DB・初期データ作成
+### 5.2 DB・初期データ作成（個別実行したい場合）
 
 ```bat
 venv\Scripts\python.exe set_up.py
@@ -420,7 +420,7 @@ venv\Scripts\python.exe set_up.py
 6. `scripts/fix_date_format.py`
 7. `scripts/migrate.py`
 
-### 5.3 年度の追加（運用時）
+### 5.3 年度の追加
 
 #### 方法A: 設定値を更新して再実行
 
@@ -437,7 +437,7 @@ venv\Scripts\python.exe scripts/generate_date_master.py
 venv\Scripts\python.exe scripts/generate_holiday_master.py
 ```
 
-#### 方法B: 追加年度だけを生成
+#### 方法B: 追加年度だけを生成（推奨）
 
 既存データの最大年度の次年度を1年追加:
 
