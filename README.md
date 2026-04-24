@@ -437,7 +437,7 @@ venv\Scripts\python.exe scripts/generate_date_master.py
 venv\Scripts\python.exe scripts/generate_holiday_master.py
 ```
 
-#### 方法B: 追加年度だけを生成（推奨）
+#### 方法B: 追加年度だけを生成
 
 既存データの最大年度の次年度を1年追加:
 
@@ -468,7 +468,7 @@ venv\Scripts\python.exe -m streamlit run streamlit_app/app.py
 
 ---
 
-## 6. 運用ルール（重要）
+## 6. 運用ルール
 
 ### 6.1 診療科名の基準と帳票別名称切替
 
