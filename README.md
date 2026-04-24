@@ -493,9 +493,11 @@ venv\Scripts\python.exe -m streamlit run streamlit_app/app.py
 - 終了日未定は `9999-12-31` を使用
 - 帳票キーは `T_ConsultationSlot` / `T_TemporarySchedule` の `Rpt1〜Rpt6` 系カラムで管理
 - 予定変更反映は「同一日・同一枠の最新変更（最新 `ChangeID`）」を採用
+- `ChangeTypeID=1`（取消）は `V_ScheduleActual` では除外される
 - 帳票②表示制御には `Rpt2Flag` を使用
 - 祝日除外は `V_ScheduleBase` 生成時点で適用
 - 変更登録履歴画面で `ActiveFlag` の切替が可能（無効化データの再表示可）
+- 臨時外来は `T_TemporarySchedule` を直接参照して反映され、`V_ScheduleActual` 上の `SlotID` は `NULL` になる
 
 ---
 
