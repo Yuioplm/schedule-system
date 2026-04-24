@@ -58,6 +58,35 @@
 
 ### 2.4 テーブル/ビュー カラム説明（現行DB定義ベース）
 
+
+### 2.5 診療科名の使い分けルール（運用上の重要点）
+
+本システムでは、**「どの帳票・どの画面で、どの診療科名を使うか」**を次の2段階で管理します。
+
+1. `M_ClinicalDepartment`
+   - 診療科そのもののマスタ
+   - `Rpt1Flag`〜`Rpt6Flag` で「帳票ごとの出力対象」を制御
+   - `Rpt1Sort` で帳票①の表示順を制御
+2. `T_ConsultationSlot`
+   - 枠ごとに `Rpt1ClinDeptID`（帳票①用の基準診療科）と、`Rpt2ClinDeptID`〜`Rpt6ClinDeptID`（帳票②〜⑥用の帳票向け診療科）を保持
+   - 帳票②〜⑥用の名称は `M_ReportClinicalDepartment` を参照し、帳票ごとに表示名を切り替える
+
+> 実務上のポイント: 画面上で「診療科名」と表示される場面でも、内部的には `Rpt1ClinDeptID`（帳票①用診療科）を基準キーとして扱う箇所があります。
+
+#### ベース画面で使う「診療科名」の基準
+
+次の4画面は、ベースとして `T_ConsultationSlot.Rpt1ClinDeptID` を用います。
+
+- `2_予定検索.py`
+- `3_予定変更入力.py`
+- `4_反映後予定検索.py`
+- `5_変更登録履歴.py`
+
+このため、これらの画面での診療科選択・診療科表示は、運用上は**「帳票①用診療科名（Rpt1ClinDeptID）」が基準**です。
+帳票②〜⑥で見せる診療科名を切り替えたい場合は、`T_ConsultationSlot` の `Rpt2ClinDeptID`〜`Rpt6ClinDeptID` と
+`M_ReportClinicalDepartment` 側の定義を合わせて調整します。
+
+
 > 参照元: `sql/create_tables.sql`  
 > `ID` は主キー、`ActiveFlag` は `1=有効 / 0=無効` 運用を想定。
 
