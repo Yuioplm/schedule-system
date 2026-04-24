@@ -28,7 +28,7 @@ PREVIEW_COLUMN_LABELS = {
     "WeekPattern": "週番号",
     "TimeSlotName": "時間帯",
     "Room": "診察室",
-    "ClinDeptName": "診療科名",
+    "ClinDeptName": "帳票①用診療科名",
     "SpecialtyName": "帳票①用専門外来名",
     "Rpt1DisplayDoctorName": "帳票①用医師表示名",
     "Rpt2ClinDeptName": "帳票②用診療科名",
@@ -42,12 +42,12 @@ PREVIEW_COLUMN_LABELS = {
 }
 PREVIEW_FORM_COLUMNS = [
     "SlotID",
-    "ClinDeptName",
-    "DoctorName",
     "DayOfWeek",
     "WeekPattern",
     "TimeSlotName",
     "Room",
+    "DoctorName",
+    "ClinDeptName",
     "SpecialtyName",
     "Rpt1DisplayDoctorName",
     "Rpt2ClinDeptName",
@@ -185,20 +185,6 @@ else:
 
     st.caption("選択した枠を編集できます（終了日だけ修正したい場合も可）。")
     with st.form("edit_slot_form"):
-        dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
-        edit_dept_id = st.selectbox(
-            "診療科名",
-            dept_options,
-            index=_safe_option_index(dept_options, None if pd.isna(selected_row["Rpt1ClinDeptID"]) else int(selected_row["Rpt1ClinDeptID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
-        )
-        doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
-        edit_doctor_id = st.selectbox(
-            "医師名",
-            doctor_options,
-            index=_safe_option_index(doctor_options, None if pd.isna(selected_row["DoctorID"]) else int(selected_row["DoctorID"])),
-            format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
-        )
         edit_day = st.selectbox(
             "曜日",
             [None] + [v for v, _ in DAY_OPTIONS],
@@ -216,6 +202,20 @@ else:
             format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
         )
         edit_room = st.text_input("診察室", value="" if pd.isna(selected_row["Room"]) else str(selected_row["Room"]))
+        doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
+        edit_doctor_id = st.selectbox(
+            "医師名",
+            doctor_options,
+            index=_safe_option_index(doctor_options, None if pd.isna(selected_row["DoctorID"]) else int(selected_row["DoctorID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+        )
+        dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
+        edit_dept_id = st.selectbox(
+            "帳票①用診療科名",
+            dept_options,
+            index=_safe_option_index(dept_options, None if pd.isna(selected_row["Rpt1ClinDeptID"]) else int(selected_row["Rpt1ClinDeptID"])),
+            format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+        )
         specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
         edit_specialty_id = st.selectbox(
             "帳票①用専門外来名",
@@ -371,20 +371,6 @@ with st.form("create_slot_form"):
     default_doctor = int(default_row["DoctorID"]) if default_row is not None and not pd.isna(default_row["DoctorID"]) else None
     default_timeslot = int(default_row["TimeSlotID"]) if default_row is not None and not pd.isna(default_row["TimeSlotID"]) else None
 
-    new_dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
-    new_dept_id = st.selectbox(
-        "診療科名",
-        new_dept_options,
-        index=_safe_option_index(new_dept_options, default_dept),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
-    )
-    new_doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
-    new_doctor_id = st.selectbox(
-        "医師名",
-        new_doctor_options,
-        index=_safe_option_index(new_doctor_options, default_doctor),
-        format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
-    )
     new_day = st.selectbox(
         "曜日",
         [None] + [v for v, _ in DAY_OPTIONS],
@@ -407,6 +393,20 @@ with st.form("create_slot_form"):
         format_func=lambda x: "未設定" if x is None else f"{x}: {master_timeslot.loc[master_timeslot['TimeSlotID'] == x, 'TimeSlotName'].iloc[0]}",
     )
     new_room = st.text_input("診察室", value="" if default_row is None or pd.isna(default_row["Room"]) else str(default_row["Room"]))
+    new_doctor_options = [None] + master_doctor["DoctorID"].astype(int).tolist()
+    new_doctor_id = st.selectbox(
+        "医師名",
+        new_doctor_options,
+        index=_safe_option_index(new_doctor_options, default_doctor),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_doctor.loc[master_doctor['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+    )
+    new_dept_options = [None] + master_dept["ClinDeptID"].astype(int).tolist()
+    new_dept_id = st.selectbox(
+        "帳票①用診療科名",
+        new_dept_options,
+        index=_safe_option_index(new_dept_options, default_dept),
+        format_func=lambda x: "未設定" if x is None else f"{x}: {master_dept.loc[master_dept['ClinDeptID'] == x, 'ClinDeptName'].iloc[0]}",
+    )
     new_specialty_options = [None] + master_specialty["SpecialtyID"].astype(int).tolist()
     new_specialty_id = st.selectbox(
         "帳票①用専門外来名",
