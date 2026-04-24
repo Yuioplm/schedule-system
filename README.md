@@ -267,33 +267,6 @@
 | ChangeDetail | 変更内容/備考 |
 | Reason | 変更理由 |
 
-### 2.5 診療科名の使い分けルール（運用上の重要点）
-
-本システムでは、**「どの帳票・どの画面で、どの診療科名を使うか」**を次の2段階で管理します。
-
-1. `M_ClinicalDepartment`
-   - 診療科そのもののマスタ
-   - `Rpt1Flag`〜`Rpt6Flag` で「帳票ごとの出力対象」を制御
-   - `Rpt1Sort` で帳票①の表示順を制御
-2. `T_ConsultationSlot`
-   - 枠ごとに `Rpt1ClinDeptID`（帳票①用の基準診療科）と、`Rpt2ClinDeptID`〜`Rpt6ClinDeptID`（帳票②〜⑥用の帳票向け診療科）を保持
-   - 帳票②〜⑥用の名称は `M_ReportClinicalDepartment` を参照し、帳票ごとに表示名を切り替える
-
-> 実務上のポイント: 画面上で「診療科名」と表示される場面でも、内部的には `Rpt1ClinDeptID`（帳票①用診療科）を基準キーとして扱う箇所があります。
-
-#### ベース画面で使う「診療科名」の基準
-
-次の4画面は、ベースとして `T_ConsultationSlot.Rpt1ClinDeptID` を用います。
-
-- `2_予定検索.py`
-- `3_予定変更入力.py`
-- `4_反映後予定検索.py`
-- `5_変更登録履歴.py`
-
-このため、これらの画面での診療科選択・診療科表示は、運用上は**「帳票①用診療科名（Rpt1ClinDeptID）」が基準**です。
-帳票②〜⑥で見せる診療科名を切り替えたい場合は、`T_ConsultationSlot` の `Rpt2ClinDeptID`〜`Rpt6ClinDeptID` と
-`M_ReportClinicalDepartment` 側の定義を合わせて調整します。
-
 ---
 
 ## 3. 画面構成（`streamlit_app/pages`）
@@ -497,9 +470,29 @@ venv\Scripts\python.exe -m streamlit run streamlit_app/app.py
 
 ## 6. 運用ルール（重要）
 
+### 6.1 診療科名の基準と帳票別名称切替
+
+- `M_ClinicalDepartment`
+  - `Rpt1Flag`〜`Rpt6Flag` で帳票ごとの出力対象を制御
+  - `Rpt1Sort` で帳票①の表示順を制御
+- `T_ConsultationSlot`
+  - `Rpt1ClinDeptID` をベース診療科（帳票①基準）として保持
+  - `Rpt2ClinDeptID`〜`Rpt6ClinDeptID` を帳票別の表示切替キーとして保持
+- `M_ReportClinicalDepartment`
+  - 帳票②〜⑥向けの診療科表示名（必要に応じて専門外来名運用を含む）を定義
+
+次の4画面では、ベースとして `T_ConsultationSlot.Rpt1ClinDeptID` を使用します。
+
+- `2_予定検索.py`
+- `3_予定変更入力.py`
+- `4_反映後予定検索.py`
+- `5_変更登録履歴.py`
+
+### 6.2 その他のデータ運用ルール
+
 - 終了日未定は `9999-12-31` を使用
 - 帳票キーは `T_ConsultationSlot` / `T_TemporarySchedule` の `Rpt1〜Rpt6` 系カラムで管理
-- 予定変更反映は「同一日・同一枠の最新変更」を採用
+- 予定変更反映は「同一日・同一枠の最新変更（最新 `ChangeID`）」を採用
 - 帳票②表示制御には `Rpt2Flag` を使用
 - 祝日除外は `V_ScheduleBase` 生成時点で適用
 - 変更登録履歴画面で `ActiveFlag` の切替が可能（無効化データの再表示可）
