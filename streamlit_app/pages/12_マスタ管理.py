@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import sqlite3
 from time import perf_counter
 import subprocess
 import sys
@@ -92,6 +93,28 @@ def _input_widget(field_name: str, field_type: str, default, key_prefix: str):
     return st.text_input(field_name, value=val, key=key)
 
 
+def _show_db_error(exc: Exception, table: str, pk: str, target_id: int | None = None):
+    if isinstance(exc, sqlite3.IntegrityError):
+        msg = str(exc)
+        if "UNIQUE constraint failed" in msg:
+            record_label = f"（ID: {target_id}）" if target_id is not None else ""
+            st.error(
+                f"登録できませんでした。{table} に同じ {pk} のデータが既に存在します{record_label}。"
+                "別のIDを指定してください。"
+            )
+            return
+        if "NOT NULL constraint failed" in msg:
+            st.error("必須項目が未入力のため保存できませんでした。入力内容をご確認ください。")
+            return
+        if "FOREIGN KEY constraint failed" in msg:
+            st.error("関連するマスタ情報との整合性エラーです。入力内容をご確認ください。")
+            return
+        st.error("データの整合性エラーにより保存できませんでした。入力内容をご確認ください。")
+        return
+
+    st.error(f"保存中に予期しないエラーが発生しました: {type(exc).__name__}")
+
+
 def render_master_ui(config: dict):
     table = config["table"]
     pk = config["pk"]
@@ -174,7 +197,7 @@ def render_master_ui(config: dict):
                         table=table,
                         error=type(exc).__name__,
                     )
-                    raise
+                    _show_db_error(exc, table, pk, int(selected_id))
 
     with st.form(f"create_form_{table}"):
         st.subheader("新規登録")
@@ -227,7 +250,7 @@ def render_master_ui(config: dict):
                     table=table,
                     error=type(exc).__name__,
                 )
-                raise
+                _show_db_error(exc, table, pk, int(new_id))
 
 
 def get_fiscal_year_range() -> tuple[int | None, int | None]:
