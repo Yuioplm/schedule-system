@@ -54,11 +54,26 @@ timeslot_df = pd.read_sql(
     conn,
 )
 
+
+def _sync_end_date_from_start(start_key: str, end_key: str) -> None:
+    st.session_state[end_key] = st.session_state[start_key]
+
+
+if "actual_schedule_search_date_from" not in st.session_state:
+    st.session_state["actual_schedule_search_date_from"] = pd.Timestamp.today().date()
+if "actual_schedule_search_date_to" not in st.session_state:
+    st.session_state["actual_schedule_search_date_to"] = st.session_state["actual_schedule_search_date_from"]
+
 col1, col2 = st.columns(2)
 with col1:
-    date_from = st.date_input("開始日")
+    date_from = st.date_input(
+        "開始日",
+        key="actual_schedule_search_date_from",
+        on_change=_sync_end_date_from_start,
+        args=("actual_schedule_search_date_from", "actual_schedule_search_date_to"),
+    )
 with col2:
-    date_to = st.date_input("終了日")
+    date_to = st.date_input("終了日", key="actual_schedule_search_date_to")
 
 col3, col4, col5 = st.columns(3)
 with col3:
