@@ -199,11 +199,26 @@ COLUMN_LABEL_RENAMES = {
     "DoctorName": "医師名",
 }
 
+
+def _sync_end_date_from_start(start_key: str, end_key: str) -> None:
+    st.session_state[end_key] = st.session_state[start_key]
+
+
+if "change_history_date_from" not in st.session_state:
+    st.session_state["change_history_date_from"] = pd.Timestamp.today().date()
+if "change_history_date_to" not in st.session_state:
+    st.session_state["change_history_date_to"] = st.session_state["change_history_date_from"]
+
 col1, col2 = st.columns(2)
 with col1:
-    date_from = st.date_input("開始日")
+    date_from = st.date_input(
+        "開始日",
+        key="change_history_date_from",
+        on_change=_sync_end_date_from_start,
+        args=("change_history_date_from", "change_history_date_to"),
+    )
 with col2:
-    date_to = st.date_input("終了日")
+    date_to = st.date_input("終了日", key="change_history_date_to")
 
 show_inactive = st.checkbox("無効化済み(ActiveFlag=0)も表示", value=False)
 
