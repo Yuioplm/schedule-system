@@ -115,11 +115,31 @@ def _show_db_error(exc: Exception, table: str, pk: str, target_id: int | None = 
     st.error(f"保存中に予期しないエラーが発生しました: {type(exc).__name__}")
 
 
+def _get_required_text_fields(table: str) -> set[str]:
+    info_rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    # PRAGMA table_info: cid, name, type, notnull, dflt_value, pk
+    return {
+        row[1]
+        for row in info_rows
+        if int(row[3]) == 1 and "TEXT" in str(row[2]).upper()
+    }
+
+
+def _validate_required_text_fields(values: dict, required_text_fields: set[str]) -> bool:
+    for field_name in required_text_fields:
+        val = values.get(field_name)
+        if isinstance(val, str) and val.strip() == "":
+            st.error(f"{field_name} は必須項目です。空欄では登録/更新できません。")
+            return False
+    return True
+
+
 def render_master_ui(config: dict):
     table = config["table"]
     pk = config["pk"]
     display = config["display"]
     fields = config["fields"]
+    required_text_fields = _get_required_text_fields(table)
 
     df = pd.read_sql(f"SELECT * FROM {table} ORDER BY {pk}", conn)
     st.caption(f"テーブル: {table}")
@@ -162,6 +182,8 @@ def render_master_ui(config: dict):
 
             submitted = st.form_submit_button("更新")
             if submitted:
+                if not _validate_required_text_fields(values, required_text_fields):
+                    return
                 request_id = log_event(
                     "update_start",
                     "マスタ管理",
@@ -214,6 +236,11 @@ def render_master_ui(config: dict):
 
         submitted_new = st.form_submit_button("登録")
         if submitted_new:
+            if int(new_id) <= 0:
+                st.error(f"{pk} には 1 以上の値を指定してください。")
+                return
+            if not _validate_required_text_fields(new_values, required_text_fields):
+                return
             request_id = log_event(
                 "update_start",
                 "マスタ管理",
