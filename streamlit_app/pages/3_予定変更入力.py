@@ -43,6 +43,7 @@ with tab1:
                 "ChangeTypeID",
             ].iloc[0]
         )
+        is_substitute_change = change_type_name == "代診"
 
         doctor_df = pd.read_sql(
             """
@@ -54,10 +55,18 @@ with tab1:
         )
 
         dept_options = [""] + sorted([x for x in doctor_df["Department"].dropna().unique().tolist()])
-        selected_department = st.selectbox("代診医検索_部署名", dept_options)
+        selected_department = st.selectbox(
+            "代診医検索_部署名",
+            dept_options,
+            disabled=not is_substitute_change,
+        )
 
         emp_options = [""] + sorted([x for x in doctor_df["EmploymentType"].dropna().unique().tolist()])
-        selected_employment = st.selectbox("代診医検索_勤務形態", emp_options)
+        selected_employment = st.selectbox(
+            "代診医検索_勤務形態",
+            emp_options,
+            disabled=not is_substitute_change,
+        )
 
         filtered_doctor_df = doctor_df.copy()
         if selected_department != "":
@@ -70,9 +79,10 @@ with tab1:
             "代診医",
             doctor_id_options,
             format_func=lambda x: "未選択" if x is None else f"{x}: {filtered_doctor_df.loc[filtered_doctor_df['DoctorID'] == x, 'DoctorName'].iloc[0]}",
+            disabled=not is_substitute_change,
         )
 
-        new_doctor_id = selected_doctor_id
+        new_doctor_id = selected_doctor_id if is_substitute_change else None
 
         new_timeslot_id = None
         new_room = None
@@ -84,7 +94,7 @@ with tab1:
             key="normal_hide_from_report2",
             help="チェックすると帳票➁ 予定変更一覧に表示されません",
         )
-        changed_by = st.text_input("ChangedBy")
+        changed_by = st.text_input("変更者")
 
         if st.button("変更登録"):
             request_id = log_event(
