@@ -5,6 +5,7 @@ from time import perf_counter
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 st.set_page_config(layout="wide")
@@ -116,6 +117,7 @@ def _safe_day_of_week(value, default: int = 1) -> int:
 
 st.title("枠管理")
 log_page_open("枠管理")
+render_page_guide("枠管理")
 conn = get_conn()
 
 slot_query = load_sql("ConsultationSlot_list.sql")

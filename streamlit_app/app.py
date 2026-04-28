@@ -4,7 +4,7 @@ from streamlit_app.log_events import log_event
 from streamlit_app.logging_config import setup_logger
 from streamlit_app.services.shutdown_service import backup_and_shutdown_with_logger
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 logger = setup_logger("streamlit_app.app")
 
@@ -51,9 +51,10 @@ pages = [
     st.Page("pages/10_帳票5.py", title="帳票➄ 常勤・非常勤月別コマ数"),
     st.Page("pages/11_帳票6.py", title="帳票⑥ 非常勤医師勤務報告書"),
     st.Page("pages/12_マスタ管理.py", title="マスタ管理"),
+    st.Page("pages/13_ドキュメント閲覧.py", title="ドキュメント閲覧"),
 ]
 
 log_event("navigation_start", "メニュー", page_count=len(pages))
-navigation = st.navigation(pages)
+navigation = st.navigation(pages, expanded=True)
 log_event("navigation_ready", "メニュー", page_count=len(pages))
 navigation.run()

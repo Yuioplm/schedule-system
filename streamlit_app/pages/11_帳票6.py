@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 
@@ -202,6 +203,7 @@ def write_doctor_sheet(
 st.set_page_config(layout="wide")
 st.title("帳票⑥ 非常勤医師勤務報告書")
 log_page_open("帳票⑥ 非常勤医師勤務報告書")
+render_page_guide("帳票⑥ 非常勤医師勤務報告書")
 
 conn = get_conn()
 

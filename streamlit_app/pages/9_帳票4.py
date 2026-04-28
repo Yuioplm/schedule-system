@@ -5,6 +5,7 @@ from time import perf_counter
 
 from scripts import settings
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 conn = settings.get_conn()
@@ -21,6 +22,7 @@ def _resolve_available_years():
 
 st.title("帳票➃ 常勤日別コマ数")
 log_page_open("帳票➃ 常勤日別コマ数")
+render_page_guide("帳票➃ 常勤日別コマ数")
 
 years = _resolve_available_years()
 months = list(range(1, 13))
