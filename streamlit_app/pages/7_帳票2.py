@@ -4,11 +4,13 @@ from time import perf_counter
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 st.set_page_config(layout="wide")
 st.title("帳票➁ 予定変更一覧")
 log_page_open("帳票➁ 予定変更一覧")
+render_page_guide("帳票➁ 予定変更一覧")
 
 conn = get_conn()
 

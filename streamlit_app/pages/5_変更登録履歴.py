@@ -12,6 +12,7 @@ from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 
@@ -177,6 +178,7 @@ def save_output_history(conn, target_df: pd.DataFrame, output_by: str, output_da
 
 st.title("変更登録履歴検索")
 log_page_open("変更登録履歴検索")
+render_page_guide("変更登録履歴検索")
 conn = get_conn()
 
 st.caption("予定変更入力・臨時外来登録の入力内容を、非表示設定を含めて確認できます。")

@@ -8,10 +8,12 @@ from pathlib import Path
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 
 
 st.title("マスタ管理")
 log_page_open("マスタ管理")
+render_page_guide("マスタ管理")
 conn = get_conn()
 
 

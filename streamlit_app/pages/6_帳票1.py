@@ -9,6 +9,7 @@ from openpyxl.utils.cell import coordinate_to_tuple
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 
@@ -103,6 +104,7 @@ def apply_placeholder_mappings(worksheet, df: pd.DataFrame, year: int, month: in
 st.set_page_config(layout="wide")
 st.title("帳票① 外来担当医表")
 log_page_open("帳票① 外来担当医表")
+render_page_guide("帳票① 外来担当医表")
 
 conn = get_conn()
 

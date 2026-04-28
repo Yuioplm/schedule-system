@@ -4,10 +4,12 @@ from time import perf_counter
 
 from scripts.settings import get_conn
 from streamlit_app.log_events import log_event, log_page_open
+from streamlit_app.page_support import render_page_guide
 from streamlit_app.sql_loader import load_sql
 
 st.title("反映後予定検索")
 log_page_open("反映後予定検索")
+render_page_guide("反映後予定検索")
 conn = get_conn()
 
 st.caption("V_ScheduleActual をもとに、予定変更・臨時外来を反映済みの一覧を検索します。")
