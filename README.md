@@ -290,6 +290,8 @@
    - 各種マスタ編集に加え、**年度管理タブ**から次年度/指定年度範囲の追加が可能
 13. **ドキュメント閲覧**（`13_ドキュメント閲覧.py`）
    - `README.md` と `docs/*.md` をアプリ内で参照可能
+   - 表示対象は `streamlit_app/page_support.py` の `DOC_FILES` で管理
+   - 現在の表示対象: `README.md`, `担当者マニュアル.md`, `障害対応手順.md`, `ログ出力仕様.md`, `保守引継ぎ_ページ関連マップ.md`
    - 各画面の「📘 担当者マニュアルを開く」導線の遷移先
 
 サイドバーには、Windowsサーバー向けに **「💾 バックアップして終了」** ボタンがあります。
@@ -301,6 +303,12 @@
 ### 4.1 `sql/`
 
 - `create_tables.sql`（全テーブル・ビュー定義）
+- 画面検索/参照SQL
+  - `ConsultationSlot_list.sql`（枠管理一覧）
+  - `ScheduleSearch_base.sql`（予定検索）
+  - `ActualScheduleSearch_base.sql`（反映後予定検索）
+  - `ChangeHistory_search.sql`（変更登録履歴検索）
+  - `ScheduleChangeType_master.sql`（予定変更区分マスタ参照）
 - 帳票SQL
   - `Report1_pivot.sql`
   - `Report1_pivot_external.sql`
@@ -320,6 +328,7 @@
 - `import_consultation_slot.py`（初期枠取込）
 - `fix_date_format.py`（日付補正）
 - `migrate.py`（既存DBへのマイグレーション）
+- `extend_fiscal_year.py`（既存DBへ不足年度の日付・祝日を追加）
 
 ---
 
@@ -533,23 +542,33 @@ Schedule-System/
 │     ├─ start_app_silent.vbs
 │     ├─ backup_db.bat
 │     └─ stop_app.bat
-└─ streamlit_app/
-   ├─ app.py
-   ├─ sql_loader.py
-   └─ pages/
-      ├─ 1_枠管理.py
-      ├─ 2_予定検索.py
-      ├─ 3_予定変更入力.py
-      ├─ 4_反映後予定検索.py
-      ├─ 5_変更登録履歴.py
-      ├─ 6_帳票1.py
-      ├─ 7_帳票2.py
-      ├─ 8_帳票3.py
-      ├─ 9_帳票4.py
-      ├─ 10_帳票5.py
-      ├─ 11_帳票6.py
-      ├─ 12_マスタ管理.py
-      └─ 13_ドキュメント閲覧.py
+├─ streamlit_app/
+│  ├─ app.py
+│  ├─ page_support.py
+│  ├─ sql_loader.py
+│  └─ pages/
+│     ├─ 1_枠管理.py
+│     ├─ 2_予定検索.py
+│     ├─ 3_予定変更入力.py
+│     ├─ 4_反映後予定検索.py
+│     ├─ 5_変更登録履歴.py
+│     ├─ 6_帳票1.py
+│     ├─ 7_帳票2.py
+│     ├─ 8_帳票3.py
+│     ├─ 9_帳票4.py
+│     ├─ 10_帳票5.py
+│     ├─ 11_帳票6.py
+│     ├─ 12_マスタ管理.py
+│     └─ 13_ドキュメント閲覧.py
+└─ tests/
+   ├─ test_setup_and_migration.py
+   ├─ test_sql_loader.py
+   ├─ test_shutdown_service.py
+   ├─ test_smoke.py
+   ├─ test_sql_query_contracts.py
+   ├─ test_real_db_flow.py
+   ├─ test_ui_smoke.py
+   └─ test_sql_contract.py
 ```
 
 ---
@@ -597,20 +616,39 @@ Schedule-System/
 
 ---
 
-## 10. 担当者向けドキュメント
+## 10. テスト/品質確認
+
+主な自動テストは `tests/` 配下に配置しています。
+
+- `tests/test_setup_and_migration.py`: 初期セットアップ/マイグレーションの基本確認
+- `tests/test_sql_loader.py`: SQL読込ユーティリティの確認
+- `tests/test_sql_contract.py` / `tests/test_sql_query_contracts.py`: SQLファイルの列・契約確認
+- `tests/test_real_db_flow.py`: 実DB相当の基本フロー確認
+- `tests/test_smoke.py` / `tests/test_ui_smoke.py`: アプリ/画面のスモーク確認
+- `tests/test_shutdown_service.py`: バックアップして終了サービスの確認
+
+開発・改修後は、少なくとも次を実行してから配布してください。
+
+```bash
+pytest
+```
+
+---
+
+## 11. 担当者向けドキュメント
 
 日次運用手順・画面別操作の詳細は `docs/担当者マニュアル.md` を参照してください。
 
 ---
 
-## 11. ログ仕様ドキュメント
+## 12. ログ仕様ドキュメント
 
 ログ出力機能の仕様（イベント一覧、主要フィールド、運用時の確認ポイント）は  
 `docs/ログ出力仕様.md` を参照してください。
 
 ---
 
-## 12. 保守担当者向け 障害対応ドキュメント
+## 13. 保守担当者向け 障害対応ドキュメント
 
 障害発生時の一次切り分け手順（事象別の確認ポイント、エスカレーション基準）は  
 `docs/障害対応手順.md` を参照してください。
