@@ -127,6 +127,41 @@ def build_report_dataframe(
     return day_df[["日", "曜日", "AM勤務", "PM勤務", "備考"]]
 
 
+def build_work_summary_dataframe(
+    doctor_df: pd.DataFrame,
+    year: int,
+    month: int,
+    source_df: pd.DataFrame,
+) -> pd.DataFrame:
+    summary_rows = []
+
+    for doctor in doctor_df.to_dict("records"):
+        doctor_id = int(doctor["DoctorID"])
+        report_df = build_report_dataframe(
+            doctor_id=doctor_id,
+            year=year,
+            month=month,
+            source_df=source_df,
+        )
+        am_worked = report_df["AM勤務"].eq("〇")
+        pm_worked = report_df["PM勤務"].eq("〇")
+
+        summary_rows.append({
+            "医師名": doctor["DoctorName"],
+            "ID": doctor_id,
+            "所属": doctor.get("所属", "") or "",
+            "AM勤務": int(am_worked.sum()),
+            "PM勤務": int(pm_worked.sum()),
+            "半日勤務": int((am_worked ^ pm_worked).sum()),
+            "一日勤務": int((am_worked & pm_worked).sum()),
+        })
+
+    return pd.DataFrame(
+        summary_rows,
+        columns=["医師名", "ID", "所属", "AM勤務", "PM勤務", "半日勤務", "一日勤務"],
+    )
+
+
 def write_doctor_sheet(
     worksheet,
     report_df: pd.DataFrame,
@@ -401,3 +436,21 @@ if template_file is not None:
             error=type(exc).__name__,
         )
         st.error(f"Excel生成に失敗しました: {exc}")
+
+st.markdown("#### 医師別勤務回数合計")
+st.caption("選択月の日別実績を医師別に集計します。半日勤務はAM勤務・PM勤務のいずれかのみ実績ありの日、一日勤務はAM勤務・PM勤務の両方に実績ありの日を数えます。")
+summary_df = build_work_summary_dataframe(
+    doctor_df=filtered_doctor_df,
+    year=int(year),
+    month=int(month),
+    source_df=report6_source_df,
+)
+st.dataframe(summary_df, use_container_width=True)
+
+summary_csv = summary_df.to_csv(index=False).encode("utf-8-sig")
+st.download_button(
+    label="医師別勤務回数合計CSVダウンロード",
+    data=summary_csv,
+    file_name=f"帳票⑥_医師別勤務回数合計_{year}_{int(month):02d}.csv",
+    mime="text/csv",
+)
