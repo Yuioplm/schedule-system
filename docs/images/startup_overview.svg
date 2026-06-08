@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">外来スケジュール管理システムの全体像</title>
+  <desc id="desc">予定の土台、日々の変更、確認、共有の4段階で、主要画面の関係を示す図。</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 34px sans-serif; fill: #1f2937; }
+      .subtitle { font: 500 18px sans-serif; fill: #475569; }
+      .lane-title { font: 700 20px sans-serif; fill: #0f172a; }
+      .lane-note { font: 500 14px sans-serif; fill: #475569; }
+      .box-title { font: 700 22px sans-serif; fill: #111827; }
+      .box-text { font: 500 15px sans-serif; fill: #374151; }
+      .small { font: 500 13px sans-serif; fill: #64748b; }
+      .arrow { stroke: #64748b; stroke-width: 4; fill: none; marker-end: url(#arrowhead); }
+      .soft-arrow { stroke: #94a3b8; stroke-width: 3; stroke-dasharray: 8 7; fill: none; marker-end: url(#arrowhead-soft); }
+      .badge { font: 700 15px sans-serif; fill: #ffffff; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#64748b" />
+    </marker>
+    <marker id="arrowhead-soft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="680" rx="24" />
+  <text class="title" x="60" y="58">外来スケジュール管理システムの全体像</text>
+  <text class="subtitle" x="60" y="90">「予定の土台を整える」→「日々の変更を入れる」→「結果を確認する」→「共有する」の流れで使います。</text>
+
+  <!-- Lane backgrounds -->
+  <rect x="50" y="125" width="250" height="455" rx="22" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="2" />
+  <rect x="330" y="125" width="250" height="455" rx="22" fill="#ede9fe" stroke="#c4b5fd" stroke-width="2" />
+  <rect x="610" y="125" width="250" height="455" rx="22" fill="#dcfce7" stroke="#86efac" stroke-width="2" />
+  <rect x="890" y="125" width="250" height="455" rx="22" fill="#fef3c7" stroke="#fcd34d" stroke-width="2" />
+
+  <text class="lane-title" x="82" y="165">1. 予定の土台を整える</text>
+  <text class="lane-note" x="82" y="190">選択肢と通常枠を準備</text>
+  <text class="lane-title" x="362" y="165">2. 変更を登録する</text>
+  <text class="lane-note" x="362" y="190">休診・代診・臨時外来</text>
+  <text class="lane-title" x="642" y="165">3. 結果を確認する</text>
+  <text class="lane-note" x="642" y="190">最終予定と履歴を確認</text>
+  <text class="lane-title" x="922" y="165">4. 共有する</text>
+  <text class="lane-note" x="922" y="190">帳票として出力</text>
+
+  <!-- Boxes lane 1 -->
+  <rect x="80" y="225" width="190" height="98" rx="16" fill="#ffffff" stroke="#0284c7" stroke-width="3" />
+  <text class="box-title" x="115" y="263">マスタ管理</text>
+  <text class="box-text" x="108" y="291">診療科・医師</text>
+  <text class="box-text" x="118" y="313">時間帯など</text>
+
+  <rect x="80" y="380" width="190" height="98" rx="16" fill="#ffffff" stroke="#0284c7" stroke-width="3" />
+  <text class="box-title" x="123" y="418">枠管理</text>
+  <text class="box-text" x="101" y="446">定期的な</text>
+  <text class="box-text" x="108" y="468">通常枠</text>
+
+  <!-- Boxes lane 2 -->
+  <rect x="360" y="225" width="190" height="98" rx="16" fill="#ffffff" stroke="#7c3aed" stroke-width="3" />
+  <text class="box-title" x="411" y="263">予定検索</text>
+  <text class="box-text" x="389" y="291">対象枠を探す</text>
+  <text class="box-text" x="392" y="313">「変更」へ</text>
+
+  <rect x="360" y="380" width="190" height="98" rx="16" fill="#ffffff" stroke="#7c3aed" stroke-width="3" />
+  <text class="box-title" x="384" y="418">予定変更入力</text>
+  <text class="box-text" x="385" y="446">休診・代診</text>
+  <text class="box-text" x="389" y="468">臨時外来</text>
+
+  <!-- Boxes lane 3 -->
+  <rect x="640" y="225" width="190" height="98" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="3" />
+  <text class="box-title" x="660" y="263">反映後予定検索</text>
+  <text class="box-text" x="682" y="291">最終予定を</text>
+  <text class="box-text" x="704" y="313">確認</text>
+
+  <rect x="640" y="380" width="190" height="98" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="3" />
+  <text class="box-title" x="660" y="418">変更登録履歴</text>
+  <text class="box-text" x="682" y="446">登録内容を</text>
+  <text class="box-text" x="681" y="468">確認・修正</text>
+
+  <!-- Boxes lane 4 -->
+  <rect x="920" y="302" width="190" height="118" rx="16" fill="#ffffff" stroke="#d97706" stroke-width="3" />
+  <text class="box-title" x="966" y="342">帳票①〜⑥</text>
+  <text class="box-text" x="962" y="372">院内共有</text>
+  <text class="box-text" x="962" y="394">報告資料</text>
+
+  <!-- Main arrows -->
+  <path class="arrow" d="M270 429 C305 429, 325 274, 360 274" />
+  <path class="arrow" d="M455 323 L455 380" />
+  <path class="arrow" d="M550 429 C585 429, 605 274, 640 274" />
+  <path class="arrow" d="M550 429 L640 429" />
+  <path class="arrow" d="M830 274 C865 274, 885 361, 920 361" />
+
+  <!-- Supporting arrows -->
+  <path class="soft-arrow" d="M175 323 L175 380" />
+  <path class="soft-arrow" d="M735 323 L735 380" />
+
+</svg>
