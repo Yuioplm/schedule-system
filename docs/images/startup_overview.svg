@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
   <title id="title">外来スケジュール管理システムの全体像</title>
-  <desc id="desc">予定の土台、日々の変更、確認、共有の4段階で、主要画面の関係を示す図。</desc>
+  <desc id="desc">予定の土台、日々の変更、確認、帳票出力の4段階で、主要画面の関係を示す図。</desc>
   <defs>
     <style>
       .bg { fill: #f8fafc; }
@@ -25,7 +25,7 @@
 
   <rect class="bg" x="0" y="0" width="1200" height="680" rx="24" />
   <text class="title" x="60" y="58">外来スケジュール管理システムの全体像</text>
-  <text class="subtitle" x="60" y="90">「予定の土台を整える」→「日々の変更を入れる」→「結果を確認する」→「共有する」の流れで使います。</text>
+  <text class="subtitle" x="60" y="90">「予定の土台を整える」→「日々の変更を入れる」→「結果を確認する」→「帳票出力する」の流れで使います。</text>
 
   <!-- Lane backgrounds -->
   <rect x="50" y="125" width="250" height="455" rx="22" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="2" />
@@ -39,7 +39,7 @@
   <text class="lane-note" x="362" y="190">休診・代診・臨時外来</text>
   <text class="lane-title" x="642" y="165">3. 結果を確認する</text>
   <text class="lane-note" x="642" y="190">最終予定と履歴を確認</text>
-  <text class="lane-title" x="922" y="165">4. 共有する</text>
+  <text class="lane-title" x="922" y="165">4. 帳票出力する</text>
   <text class="lane-note" x="922" y="190">帳票として出力</text>
 
   <!-- Boxes lane 1 -->
