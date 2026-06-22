@@ -426,3 +426,41 @@ ORDER BY
     CalendarDate,
     TimeSlotID,
     Rpt1ClinDeptID;
+
+-- ==========================
+-- 帳票②正式出力履歴
+-- ==========================
+CREATE TABLE IF NOT EXISTS T_Report2OutputHistory (
+    OutputHistoryID INTEGER PRIMARY KEY,
+    OutputMode TEXT NOT NULL,
+    OutputStatus TEXT NOT NULL DEFAULT 'active',
+    StartDate DATE NOT NULL,
+    OutputBy TEXT,
+    OutputDate DATE,
+    FileName TEXT,
+    RecordCount INTEGER DEFAULT 0,
+    CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours')),
+    CancelledAt DATETIME,
+    CancelledBy TEXT,
+    CancelReason TEXT
+);
+
+CREATE TABLE IF NOT EXISTS T_Report2OutputHistoryDetail (
+    OutputDetailID INTEGER PRIMARY KEY,
+    OutputHistoryID INTEGER NOT NULL,
+    DiffKey TEXT NOT NULL,
+    TargetType TEXT NOT NULL,
+    TargetID INTEGER NOT NULL,
+    RowHash TEXT NOT NULL,
+    DiffStatus TEXT,
+    ReportDate DATE,
+    Weekday TEXT,
+    TimeSlot TEXT,
+    ClinicalDepartmentName TEXT,
+    BeforeDoctorName TEXT,
+    ChangeDetail TEXT,
+    Reason TEXT,
+    CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours')),
+    FOREIGN KEY (OutputHistoryID)
+        REFERENCES T_Report2OutputHistory(OutputHistoryID)
+);
