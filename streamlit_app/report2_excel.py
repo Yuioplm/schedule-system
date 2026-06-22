@@ -12,12 +12,11 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 DISPLAY_COLUMNS = ["日付", "曜日", "時間", "診療科名", "変更前医師", "変更内容", "備考"]
 INTERNAL_COLUMNS = ["登録種別", "レコードID", "差分キー"]
-EXCEL_COLUMNS = ["差分区分", *DISPLAY_COLUMNS]
+EXCEL_COLUMNS = DISPLAY_COLUMNS
 DIFF_NEW = "新規"
 DIFF_UPDATED = "更新"
 DIFF_UNCHANGED = "既出"
 HIGHLIGHT_FILL = PatternFill(fill_type="solid", fgColor="CCFFFF")
-KEYWORD_FILL = PatternFill(fill_type="solid", fgColor="CCFFFF")
 HEADER_FILL = PatternFill(fill_type="solid", fgColor="D9EAF7")
 THIN_BORDER = Border(
     left=Side(style="thin", color="808080"),
@@ -156,24 +155,31 @@ def build_report2_excel(df_with_diff: pd.DataFrame, output_mode_label: str) -> b
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = THIN_BORDER
 
+    diagonal_border = Border(
+        left=Side(style="thin", color="808080"),
+        right=Side(style="thin", color="808080"),
+        top=Side(style="thin", color="808080"),
+        bottom=Side(style="thin", color="808080"),
+        diagonal=Side(style="thin", color="808080"),
+        diagonalUp=True,
+    )
+
     for _, row in df_with_diff.iterrows():
         ws.append([normalize_cell(row.get(column)) for column in EXCEL_COLUMNS])
         excel_row = ws.max_row
         is_changed = row["差分区分"] in {DIFF_NEW, DIFF_UPDATED}
-        for cell in ws[excel_row]:
-            cell.border = THIN_BORDER
-            cell.alignment = Alignment(vertical="top", wrap_text=True)
-            if is_changed:
-                cell.fill = HIGHLIGHT_FILL
-                cell.font = Font(bold=True)
         change_text = normalize_cell(row.get("変更内容"))
         reason_text = normalize_cell(row.get("備考"))
-        if any(keyword in change_text or keyword in reason_text for keyword in ["休診", "取消", "中止"]):
-            for cell in ws[excel_row]:
-                cell.font = Font(bold=is_changed, strike=True)
-        if any(keyword in change_text or keyword in reason_text for keyword in ["要確認", "確認"]):
-            ws.cell(row=excel_row, column=EXCEL_COLUMNS.index("変更内容") + 1).fill = KEYWORD_FILL
-            ws.cell(row=excel_row, column=EXCEL_COLUMNS.index("備考") + 1).fill = KEYWORD_FILL
+        is_rest_day = "休診" in change_text
+        is_cancelled = "取消" in reason_text
+
+        for cell in ws[excel_row]:
+            cell.border = diagonal_border if is_cancelled else THIN_BORDER
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if is_changed or is_rest_day:
+                cell.fill = HIGHLIGHT_FILL
+            if is_changed:
+                cell.font = Font(bold=True)
 
     widths = {
         "A": 12,

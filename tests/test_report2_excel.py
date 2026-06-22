@@ -21,7 +21,7 @@ from streamlit_app.report2_excel import (
 )
 
 
-def _report_row(change_detail: str = "担当変更") -> dict[str, object]:
+def _report_row(change_detail: str = "担当変更", reason: str = "備考") -> dict[str, object]:
     return {
         "登録種別": "通常変更",
         "レコードID": 1,
@@ -32,7 +32,7 @@ def _report_row(change_detail: str = "担当変更") -> dict[str, object]:
         "診療科名": "内科",
         "変更前医師": "医師A",
         "変更内容": change_detail,
-        "備考": "備考",
+        "備考": reason,
     }
 
 
@@ -52,7 +52,7 @@ def test_add_diff_status_classifies_new_updated_and_unchanged() -> None:
 
 
 def test_build_report2_excel_outputs_workbook() -> None:
-    df = add_diff_status(pd.DataFrame([_report_row("休診 要確認")]), {})
+    df = add_diff_status(pd.DataFrame([_report_row("休診", "取消")]), {})
 
     workbook_bytes = build_report2_excel(df, "確認用")
 
@@ -60,7 +60,9 @@ def test_build_report2_excel_outputs_workbook() -> None:
     sheet = workbook.active
     assert sheet.title == "帳票②予定変更一覧"
     assert sheet["A1"].value == "帳票② 予定変更一覧（確認用）"
-    assert sheet["A3"].value == DIFF_NEW
+    assert sheet["A3"].value == "2026-04-06"
+    assert sheet["A3"].fill.fgColor.rgb == "00CCFFFF"
+    assert sheet["A3"].border.diagonalUp is True
 
 
 def test_save_official_output_history_persists_snapshot() -> None:
