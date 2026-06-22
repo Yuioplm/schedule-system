@@ -46,12 +46,57 @@ def ensure_output_history_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def ensure_report2_output_history_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS T_Report2OutputHistory (
+            OutputHistoryID INTEGER PRIMARY KEY,
+            OutputMode TEXT NOT NULL,
+            OutputStatus TEXT NOT NULL DEFAULT 'active',
+            StartDate DATE NOT NULL,
+            OutputBy TEXT,
+            OutputDate DATE,
+            FileName TEXT,
+            RecordCount INTEGER DEFAULT 0,
+            CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours')),
+            CancelledAt DATETIME,
+            CancelledBy TEXT,
+            CancelReason TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS T_Report2OutputHistoryDetail (
+            OutputDetailID INTEGER PRIMARY KEY,
+            OutputHistoryID INTEGER NOT NULL,
+            DiffKey TEXT NOT NULL,
+            TargetType TEXT NOT NULL,
+            TargetID INTEGER NOT NULL,
+            RowHash TEXT NOT NULL,
+            DiffStatus TEXT,
+            ReportDate DATE,
+            Weekday TEXT,
+            TimeSlot TEXT,
+            ClinicalDepartmentName TEXT,
+            BeforeDoctorName TEXT,
+            ChangeDetail TEXT,
+            Reason TEXT,
+            CreatedAt DATETIME DEFAULT (datetime('now', '+9 hours')),
+            FOREIGN KEY (OutputHistoryID)
+                REFERENCES T_Report2OutputHistory(OutputHistoryID)
+        )
+        """
+    )
+
+
 def main() -> None:
     conn = sqlite3.connect(DB_PATH)
     try:
         migrate_v_schedule_actual(conn)
         ensure_temporary_schedule_columns(conn)
         ensure_output_history_table(conn)
+        ensure_report2_output_history_tables(conn)
         conn.commit()
     finally:
         conn.close()

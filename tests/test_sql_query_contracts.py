@@ -215,3 +215,38 @@ def test_actual_schedule_search_uses_latest_change_detail(db_conn: sqlite3.Conne
 
     assert row is not None
     assert row[8] == "最新変更"
+
+
+def test_report2_export_uses_latest_change_contract(db_conn: sqlite3.Connection) -> None:
+    _insert_base_slot(db_conn, "2026-04-06", slot_id=1)
+    db_conn.executemany(
+        """
+        INSERT INTO T_ScheduleChange (
+            ChangeID, CalendarDate, SlotID, ChangeTypeID, ChangeDetail, Reason,
+            NewDoctorID, NewTimeSlotID, ActiveFlag, Rpt2Flag
+        ) VALUES (?, '2026-04-06', 1, 2, ?, '備考', 2, 2, 1, 1)
+        """,
+        [(1, "古い変更"), (2, "最新変更")],
+    )
+
+    cursor = db_conn.execute(_load_sql("Report2_export.sql"), {"start_date": "2026-04-01"})
+    rows = cursor.fetchall()
+
+    _assert_columns(
+        cursor,
+        [
+            "登録種別",
+            "レコードID",
+            "差分キー",
+            "日付",
+            "曜日",
+            "時間",
+            "診療科名",
+            "変更前医師",
+            "変更内容",
+            "備考",
+        ],
+    )
+    assert len(rows) == 1
+    assert rows[0][1] == 2
+    assert rows[0][8] == "最新変更"
