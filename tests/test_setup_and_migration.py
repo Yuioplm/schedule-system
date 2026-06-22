@@ -107,3 +107,25 @@ def test_migrate_rewrites_legacy_v_schedule_actual_filter() -> None:
         assert "COALESCE(CAST(ts.Rpt2Flag AS INTEGER), 1) = 1" not in sql
     finally:
         conn.close()
+
+
+def test_migrate_creates_report2_output_history_tables() -> None:
+    conn = sqlite3.connect(":memory:")
+    try:
+        migrate.ensure_report2_output_history_tables(conn)
+
+        tables = {
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table'
+                """
+            ).fetchall()
+        }
+
+        assert "T_Report2OutputHistory" in tables
+        assert "T_Report2OutputHistoryDetail" in tables
+    finally:
+        conn.close()
