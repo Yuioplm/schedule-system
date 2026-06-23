@@ -12,6 +12,7 @@
 - 通常枠変更 `T_ScheduleChange` と臨時外来 `T_TemporarySchedule` を統合した最終予定を `V_ScheduleActual` で提供
 - 変更登録履歴画面で、通常枠変更・臨時外来の**検索/編集/CSV出力/テンプレートExcel反映出力**に対応
 - 変更届の出力記録を `T_ChangeNoticeOutputHistory` に保存
+- 帳票② 予定変更一覧は、CSV出力に加えて、前回の配布用Excel出力との差分を反映した書式付きExcel（プレビュー/配布用）出力と配布用Excel出力履歴管理に対応
 - 各帳票ページは `sql/*.sql` を `streamlit_app/sql_loader.py` で読み込み実行
 - ログは `streamlit_app/logging_config.py` で設定し、`logs/app.log` にローテーション保存
 
@@ -44,6 +45,8 @@
   - `Rpt1〜Rpt6` 系カラム、`Rpt2Flag`、`ActiveFlag` を保持
 - `T_ChangeNoticeOutputHistory`（変更届出力履歴）
   - 出力対象種別、対象ID、出力者、出力日を保持
+- `T_Report2OutputHistory` / `T_Report2OutputHistoryDetail`（帳票②配布用Excel出力履歴・行スナップショット）
+  - 配布用Excel出力単位と出力時点の帳票②行内容を保持
 
 ### 2.3 ビュー
 
@@ -210,6 +213,16 @@
 | OutputBy | 出力実行者 |
 | OutputDate | 出力日時 |
 
+
+#### T_Report2OutputHistory / T_Report2OutputHistoryDetail（帳票②配布用Excel出力履歴）
+
+| テーブル | 主な用途 |
+|---|---|
+| T_Report2OutputHistory | 帳票②の配布用Excel出力単位（検索開始日、出力者、出力日、ファイル名、件数、取消情報）を保存 |
+| T_Report2OutputHistoryDetail | 配布用Excel出力時点の帳票②行スナップショット（差分キー、対象ID、行ハッシュ、表示列）を保存し、次回の新規/更新判定に使用 |
+
+帳票②の書式付きExcelでは、配布用Excel出力のみを次回差分判定の基準にします。プレビュー出力は履歴基準に含めません。
+
 #### V_ScheduleBase（通常枠展開ビュー）
 
 | カラム | 説明 |
@@ -282,6 +295,10 @@
    - 出力時の履歴保存
 6. **帳票① 外来担当医表**（`6_帳票1.py`）
 7. **帳票② 予定変更一覧**（`7_帳票2.py`）
+   - CSV出力
+   - 書式付きExcelのプレビュー出力/配布用Excel出力
+   - 配布用Excel出力履歴を基準にした新規・更新行の強調
+   - 誤出力時の配布用Excel出力履歴取消
 8. **帳票③ 外来数**（`8_帳票3.py`）
 9. **帳票④ 常勤日別コマ数**（`9_帳票4.py`）
 10. **帳票⑤ 常勤・非常勤月別コマ数**（`10_帳票5.py`）
@@ -313,6 +330,7 @@
   - `Report1_pivot.sql`
   - `Report1_pivot_external.sql`
   - `Report2.sql`
+  - `Report2_export.sql`（帳票②書式付きExcel・差分履歴比較用）
   - `Report3.sql`
   - `Report4.sql`
   - `Report5.sql`
