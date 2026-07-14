@@ -69,6 +69,8 @@ def test_build_report2_excel_outputs_workbook() -> None:
     assert sheet["F4"].border.diagonalUp is True
     assert sheet["G4"].value == "取消"
     assert sheet["G4"].border.diagonalUp is False
+    assert sheet["G4"].border.diagonalDown is False
+    assert sheet["G4"].border.diagonal.style is None
     assert sheet.row_dimensions[4].height == 41.25
     assert sheet["A3"].alignment.shrink_to_fit is True
     assert sheet["A4"].alignment.shrink_to_fit is True
