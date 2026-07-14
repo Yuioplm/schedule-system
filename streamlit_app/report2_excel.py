@@ -190,6 +190,7 @@ def build_report2_excel(df_with_diff: pd.DataFrame, output_mode_label: str) -> b
     )
 
     change_detail_col = EXCEL_COLUMNS.index("変更内容") + 1
+    cancellation_diagonal_end_col = change_detail_col
     for _, row in df_with_diff.iterrows():
         ws.append([normalize_cell(row.get(column)) for column in EXCEL_COLUMNS])
         excel_row = ws.max_row
@@ -202,7 +203,8 @@ def build_report2_excel(df_with_diff: pd.DataFrame, output_mode_label: str) -> b
         is_cancelled = "取消" in reason_text and "通常通り" not in change_text
 
         for cell in ws[excel_row]:
-            cell.border = diagonal_border if is_cancelled else THIN_BORDER
+            should_apply_diagonal = is_cancelled and cell.column <= cancellation_diagonal_end_col
+            cell.border = diagonal_border if should_apply_diagonal else THIN_BORDER
             cell.alignment = Alignment(vertical="top", shrink_to_fit=True)
             cell.font = Font(size=FONT_SIZE, bold=is_changed)
             if is_changed:
