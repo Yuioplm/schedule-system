@@ -66,7 +66,11 @@ def test_build_report2_excel_outputs_workbook() -> None:
     assert sheet["A4"].value == "2026-04-06"
     assert sheet["A4"].fill.fgColor.rgb == "FF00FFFF"
     assert sheet["A4"].border.diagonalUp is True
+    assert sheet["A4"].border.diagonal.style == "medium"
+    assert sheet["A4"].border.diagonal.color.rgb == "00000000"
     assert sheet["F4"].border.diagonalUp is True
+    assert sheet["F4"].border.diagonal.style == "medium"
+    assert sheet["F4"].border.diagonal.color.rgb == "00000000"
     assert sheet["G4"].value == "取消"
     assert sheet["G4"].border.diagonalUp is False
     assert sheet["G4"].border.diagonalDown is False

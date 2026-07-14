@@ -188,7 +188,7 @@ def build_report2_excel(df_with_diff: pd.DataFrame, output_mode_label: str) -> b
         right=Side(style="thin", color="808080"),
         top=Side(style="thin", color="808080"),
         bottom=Side(style="thin", color="808080"),
-        diagonal=Side(style="thin", color="808080"),
+        diagonal=Side(style="medium", color="000000"),
         diagonalUp=True,
     )
 
